@@ -1,0 +1,161 @@
+:root {
+  font-family:
+    'Iowan Old Style',
+    'Palatino Linotype',
+    'Book Antiqua',
+    'Palatino',
+    'Times New Roman',
+    'Source Han Serif SC',
+    'Noto Serif CJK SC',
+    'Songti SC',
+    'STSong',
+    'SimSun',
+    serif;
+  line-height: 1.5;
+  font-weight: 400;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+
+  color-scheme: only light;
+  color: #151515;
+
+  --app-background: linear-gradient(135deg, #f1ede5 0%, #ece6db 48%, #f6f2ea 100%);
+  --panel-bg: rgba(255, 252, 245, 0.84);
+  --panel-gradient: linear-gradient(180deg, #fefcf6 0%, #efe9dd 60%, #e7dfd1 100%);
+  --panel-highlight: linear-gradient(180deg, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0));
+  --shadow-outer: rgba(78, 70, 60, 0.16);
+  --shadow-inner-dark: rgba(84, 76, 66, 0.14);
+  --shadow-inner-light: rgba(255, 255, 255, 0.78);
+  --accent-soft: rgba(191, 174, 148, 0.18);
+  --accent-strong: rgba(185, 168, 140, 0.38);
+  --text-primary: #151515;
+  --text-secondary: rgba(21, 21, 21, 0.68);
+  --brand-gradient: linear-gradient(135deg, #d7c6a9 0%, #c2b39b 100%);
+  --scrollbar-track: linear-gradient(180deg, rgba(248, 242, 233, 0.86) 0%, rgba(233, 222, 207, 0.92) 100%);
+  --scrollbar-thumb: linear-gradient(180deg, rgba(198, 182, 160, 0.92) 0%, rgba(178, 160, 135, 0.95) 100%);
+  --scrollbar-thumb-active: linear-gradient(180deg, rgba(188, 171, 147, 0.98) 0%, rgba(168, 151, 128, 1) 100%);
+  --scrollbar-thumb-shadow: 0 4px 10px rgba(84, 76, 66, 0.18);
+}
+
+html,
+body {
+  height: 100%;
+  width: 100%;
+}
+
+html {
+  background: transparent;
+}
+
+body {
+  margin: 0;
+  background: transparent;
+  min-width: 320px;
+  min-height: 100vh;
+  overflow: hidden;
+  color: #151515;
+}
+
+#root {
+  width: 100%;
+  height: 100%;
+}
+
+#root > * {
+  width: 100%;
+  height: 100%;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(198, 179, 155, 0.95) rgba(242, 237, 230, 0.7);
+}
+
+*::-webkit-scrollbar {
+  width: 14px;
+  height: 14px;
+}
+
+*::-webkit-scrollbar-track {
+  background: linear-gradient(
+    to right,
+    rgba(235, 228, 218, 0.5) 0%,
+    rgba(242, 237, 230, 0.7) 50%,
+    rgba(235, 228, 218, 0.5) 100%
+  );
+  border-radius: 12px;
+  margin: 8px 0;
+  background-clip: padding-box;
+  box-shadow:
+    inset 2px 2px 6px rgba(150, 140, 126, 0.2),
+    inset -2px -2px 6px rgba(255, 255, 255, 0.8);
+}
+
+*::-webkit-scrollbar-thumb {
+  background: linear-gradient(
+    180deg,
+    rgba(212, 195, 172, 1) 0%,
+    rgba(198, 179, 155, 1) 50%,
+    rgba(186, 168, 146, 1) 100%
+  );
+  border-radius: 12px;
+  border: 3px solid rgba(242, 237, 230, 0.6);
+  background-clip: padding-box;
+  box-shadow:
+    0 4px 12px rgba(140, 128, 112, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.7),
+    inset 0 -2px 4px rgba(150, 140, 126, 0.3);
+  transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(
+    180deg,
+    rgba(222, 205, 182, 1) 0%,
+    rgba(208, 189, 165, 1) 50%,
+    rgba(196, 178, 156, 1) 100%
+  );
+  box-shadow:
+    0 6px 16px rgba(140, 128, 112, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8),
+    inset 0 -2px 6px rgba(150, 140, 126, 0.3);
+  transform: scaleY(1.03);
+}
+
+*::-webkit-scrollbar-thumb:active {
+  background: linear-gradient(
+    180deg,
+    rgba(186, 168, 146, 1) 0%,
+    rgba(178, 160, 138, 1) 50%,
+    rgba(168, 150, 128, 1) 100%
+  );
+  box-shadow:
+    0 2px 8px rgba(140, 128, 112, 0.35),
+    inset 0 2px 6px rgba(120, 110, 96, 0.4),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.5);
+  transform: scaleY(0.98);
+  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+*::-webkit-scrollbar-button {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}

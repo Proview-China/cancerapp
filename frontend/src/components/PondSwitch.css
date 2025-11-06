@@ -1,0 +1,96 @@
+.pond-switch-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-radius: 14px;
+  background: linear-gradient(145deg, rgba(252, 247, 239, 0.92), rgba(234, 223, 208, 0.92));
+  box-shadow:
+    inset 4px 4px 10px rgba(163, 150, 130, 0.22),
+    inset -4px -4px 10px rgba(255, 255, 255, 0.75),
+    0 6px 14px rgba(88, 80, 70, 0.16);
+  min-height: 52px;
+}
+
+.pond-switch-label {
+  font-size: 0.92rem;
+  color: var(--text-primary);
+  font-weight: 500;
+  user-select: none;
+  flex: 1;
+}
+
+/* iOS 风格开关 */
+.pond-switch {
+  position: relative;
+  border: none;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  outline: none;
+}
+
+.pond-switch__track {
+  position: relative;
+  display: block;
+  width: 52px;
+  height: 32px;
+  border-radius: 16px;
+  background: linear-gradient(145deg, #ef4444, #dc2626);
+  box-shadow:
+    inset 2px 2px 6px rgba(127, 29, 29, 0.4),
+    inset -2px -2px 6px rgba(254, 202, 202, 0.3);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.pond-switch.is-checked .pond-switch__track {
+  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+  box-shadow:
+    inset 2px 2px 6px rgba(21, 128, 61, 0.4),
+    inset -2px -2px 6px rgba(187, 247, 208, 0.3),
+    0 2px 8px rgba(34, 197, 94, 0.3);
+}
+
+.pond-switch__thumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 26px;
+  height: 26px;
+  border-radius: 13px;
+  background: linear-gradient(145deg, #ffffff, #f5f0e8);
+  box-shadow:
+    0 3px 8px rgba(88, 80, 70, 0.25),
+    inset -1px -1px 2px rgba(150, 140, 125, 0.1),
+    inset 1px 1px 2px rgba(255, 255, 255, 0.9);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.pond-switch.is-checked .pond-switch__thumb {
+  left: 23px;
+  box-shadow:
+    0 3px 8px rgba(88, 80, 70, 0.3),
+    inset -1px -1px 2px rgba(150, 140, 125, 0.15),
+    inset 1px 1px 2px rgba(255, 255, 255, 0.95);
+}
+
+.pond-switch:hover .pond-switch__track {
+  filter: brightness(1.05);
+}
+
+.pond-switch.is-checked:hover .pond-switch__track {
+  filter: brightness(1.05);
+}
+
+.pond-switch:active .pond-switch__thumb {
+  width: 30px;
+}
+
+.pond-switch.is-checked:active .pond-switch__thumb {
+  left: 19px;
+}
+
+.pond-switch:focus-visible .pond-switch__track {
+  outline: 2px solid rgba(194, 179, 155, 0.5);
+  outline-offset: 2px;
+}

@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(tree:*)",
+      "Bash(npm run electron:dev:*)",
+      "Bash(npm run dev)",
+      "Bash(curl:*)",
+      "Bash(cat:*)",
+      "Bash(npx electron:*)",
+      "Bash(node_modules/electron/dist/electron:*)",
+      "Bash(find:*)",
+      "Bash(lsof:*)",
+      "Bash(pkill:*)",
+      "Bash(identify:*)",
+      "Bash(python3:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

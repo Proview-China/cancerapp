@@ -1,0 +1,39 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+frontend/node_modules
+frontend/dist
+frontend/dist-ssr
+# Backend/build artifacts
+backend/node_modules
+backend/dist
+
+# Root dependencies/cache
+node_modules
+
+# App runtime/uploads and local binaries
+uploads/
+electron-v33.2.0-linux-x64/
+pictures/
+
+# Large local docs not for VCS
+*.docx
+*.local
+*.pdb
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
