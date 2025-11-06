@@ -36,10 +36,10 @@ const SIDEBAR_ENABLED: Record<PageKey, boolean> = {
 
 function App() {
   const [sidebarWidths, setSidebarWidths] = useState<Record<PageKey, number>>({
-    analysis: 280,
-    data: 280,
-    tasks: 280,
-    preferences: 280,
+    analysis: MIN_SIDEBAR_WIDTH,
+    data: MIN_SIDEBAR_WIDTH,
+    tasks: MIN_SIDEBAR_WIDTH,
+    preferences: MIN_SIDEBAR_WIDTH,
   })
   const [resizingKey, setResizingKey] = useState<PageKey | null>(null)
   const [activePage, setActivePage] = useState<PageKey>('analysis')
@@ -408,7 +408,7 @@ function App() {
                     className={['canvas-page__layout', hasSidebar ? 'has-sidebar' : 'no-sidebar'].join(' ')}
                     style={{
                       gridTemplateColumns: hasSidebar && sidebarWidth
-                        ? `${sidebarWidth}px 6px minmax(0, 1fr)`
+                        ? `${Math.max(MIN_SIDEBAR_WIDTH, sidebarWidth)}px 6px minmax(0, 1fr)`
                         : undefined,
                     }}
                   >

@@ -323,7 +323,7 @@
 .report-item__title {
   font-weight: 600;
   color: var(--text-primary);
-  font-size: 0.95rem;
+  font-size: 1rem; /* 统一标题字号 */
 }
 
 .report-item__summary {
@@ -339,7 +339,8 @@
 
 .report-item__actions {
   display: flex;
-  gap: 6px;
+  gap: 8px; /* 统一按钮间距 */
+  margin-left: auto; /* 操作区右对齐 */
 }
 
 .report-item__action {
