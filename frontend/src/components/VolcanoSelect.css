@@ -1,0 +1,168 @@
+.volcano-select-container {
+  position: relative;
+  width: 180px;
+  flex-shrink: 0;
+}
+
+/* 火山口按钮 - 凹陷设计 */
+.volcano-select {
+  width: 100%;
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: none;
+  background: var(--panel-gradient);
+  color: var(--text-primary);
+  font-size: 0.92rem;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow:
+    inset 4px 4px 10px rgba(163, 150, 130, 0.22),
+    inset -4px -4px 10px rgba(255, 255, 255, 0.75),
+    0 2px 6px rgba(88, 80, 70, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  text-align: left;
+}
+
+.volcano-select:hover {
+  box-shadow:
+    inset 3px 3px 8px rgba(150, 138, 122, 0.2),
+    inset -3px -3px 8px rgba(255, 255, 255, 0.78),
+    0 4px 10px rgba(88, 80, 70, 0.12);
+}
+
+.volcano-select:focus {
+  outline: none;
+  box-shadow:
+    inset 4px 4px 10px rgba(163, 150, 130, 0.25),
+    inset -4px -4px 10px rgba(255, 255, 255, 0.78),
+    0 0 0 3px rgba(194, 179, 155, 0.2);
+}
+
+.volcano-select:active {
+  box-shadow:
+    inset 5px 5px 12px rgba(154, 140, 122, 0.28),
+    inset -5px -5px 12px rgba(255, 255, 255, 0.78),
+    0 2px 6px rgba(88, 80, 70, 0.1);
+}
+
+.volcano-select__value {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.volcano-select__arrow {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(150, 140, 126, 1);
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.volcano-select__arrow.is-open {
+  transform: rotate(180deg);
+}
+
+/* 下拉菜单 */
+.volcano-select__dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: 100;
+  border-radius: 12px;
+  background: var(--panel-gradient);
+  box-shadow:
+    0 12px 32px rgba(88, 80, 70, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  animation: volcanoDropdownSlide 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  max-height: 280px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+@keyframes volcanoDropdownSlide {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 池塘选项 - 凸起设计 */
+.pond-option {
+  width: 100%;
+  padding: 10px 14px;
+  border: none;
+  border-radius: 10px;
+  background: linear-gradient(145deg, rgba(252, 247, 239, 0.92), rgba(234, 223, 208, 0.92));
+  color: var(--text-primary);
+  font-size: 0.92rem;
+  font-weight: 500;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow:
+    2px 2px 6px rgba(163, 150, 130, 0.15),
+    -2px -2px 6px rgba(255, 255, 255, 0.8),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5);
+}
+
+.pond-option:hover {
+  background: linear-gradient(145deg, rgba(255, 250, 243, 0.96), rgba(239, 228, 213, 0.94));
+  box-shadow:
+    3px 3px 8px rgba(163, 150, 130, 0.18),
+    -3px -3px 8px rgba(255, 255, 255, 0.85),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  transform: translateY(-1px);
+}
+
+.pond-option:active {
+  transform: translateY(0);
+  box-shadow:
+    1px 1px 3px rgba(163, 150, 130, 0.12),
+    -1px -1px 3px rgba(255, 255, 255, 0.7),
+    inset 2px 2px 6px rgba(163, 150, 130, 0.15);
+}
+
+/* 选中状态 */
+.pond-option.is-selected {
+  background: linear-gradient(145deg, #4a90e2, #357abd);
+  color: white;
+  font-weight: 600;
+  box-shadow:
+    2px 2px 8px rgba(53, 122, 189, 0.4),
+    -2px -2px 8px rgba(74, 144, 226, 0.3),
+    inset 1px 1px 3px rgba(255, 255, 255, 0.2);
+}
+
+.pond-option.is-selected:hover {
+  background: linear-gradient(145deg, #5a9fe8, #4585c3);
+  box-shadow:
+    3px 3px 10px rgba(53, 122, 189, 0.45),
+    -3px -3px 10px rgba(74, 144, 226, 0.35),
+    inset 1px 1px 3px rgba(255, 255, 255, 0.25);
+}
+
+.pond-option.is-selected:active {
+  background: linear-gradient(145deg, #3a80d2, #2670ad);
+  box-shadow:
+    1px 1px 4px rgba(53, 122, 189, 0.35),
+    -1px -1px 4px rgba(74, 144, 226, 0.25),
+    inset 2px 2px 6px rgba(30, 80, 140, 0.3);
+}
