@@ -53,3 +53,18 @@ npm run tauri:dev
    - 影像支持缩放拖拽，居中显示；
    - 文字以 Markdown 渲染，并在分析面板中展示摘要与标签。
 5. 文字病历支持“编辑”“删除”操作；影像可单独删除或通过后端 API 重命名、补充样例。
+
+## UI 细节规范（update-ui-detail-polish）
+
+- 侧边栏最小宽度：360px（与 `MIN_SIDEBAR_WIDTH` 一致）。
+  - Analysis 侧栏：`.analysis-sidebar { min-width: 360px; }`
+  - Preferences 侧栏：`.preferences-sidebar { min-width: 360px; }`
+  - 栅格列宽在运行时同样使用 `Math.max(MIN_SIDEBAR_WIDTH, sidebarWidth)` 约束，确保任何情况下不低于阈值。
+- 卡片/列表排版：
+  - 标题字号/粗细：`font-size: 1rem; font-weight: 600`（如 `.report-item__title`）。
+  - 摘要双行截断：`display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;`（如 `.report-item__summary`）。
+  - 操作区对齐与间距：按钮组右对齐（`margin-left: auto`），按钮间距 `8px`（如 `.report-item__actions`）。
+- 验证与审计：
+  - 构建：`cd frontend && npm run build`
+  - 预览：`npm run preview -- --port 5173`
+  - 监视：使用 Playwright MCP 访问 `http://localhost:5173`，检查侧边栏 `min-width=360px`、标题字号/粗细、摘要截断与操作区对齐。

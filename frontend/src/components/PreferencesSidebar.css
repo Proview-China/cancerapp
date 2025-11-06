@@ -37,3 +37,7 @@
   flex-direction: column;
   gap: 8px;
 }
+/* 侧边栏下限：与 MIN_SIDEBAR_WIDTH 一致（360px） */
+.preferences-sidebar {
+  min-width: 360px;
+}
