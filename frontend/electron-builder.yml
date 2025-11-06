@@ -1,0 +1,11 @@
+appId: com.cancerapp.desktop
+productName: CancerApp
+files:
+  - dist/**
+  - electron/main.cjs
+  - electron/preload.cjs
+extraMetadata:
+  main: electron/main.cjs
+directories:
+  output: release
+  buildResources: electron/resources
