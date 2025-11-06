@@ -21,6 +21,7 @@ node_modules
 uploads/
 electron-v33.2.0-linux-x64/
 pictures/
+frontend/.vite/
 
 # Large local docs not for VCS
 *.docx
