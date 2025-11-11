@@ -3,6 +3,8 @@ import type {
   CaseRecord,
   CaseReport,
   CaseReportDraft,
+  Modality,
+  TissueAnalysis,
 } from '../types/cases'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:4000'
@@ -41,6 +43,7 @@ const mapCaseRecord = (data: any): CaseRecord => ({
             : new URL(sample.storage_path, API_BASE_URL).href,
           createdAt: sample.created_at,
           updatedAt: sample.updated_at,
+          analysis: sample.analysis ?? null,
         }))
       : [],
   reports: Array.isArray(data.reports) ? data.reports.map(mapReport) : [],
@@ -109,8 +112,43 @@ export const deleteCase = async (caseId: string): Promise<void> => {
   await deleteRequest(`${API_BASE_URL}/cases/${caseId}`)
 }
 
+export const updateCase = async (caseId: string, payload: { displayName: string }): Promise<CaseRecord> => {
+  const data = await jsonRequest<any>(`${API_BASE_URL}/cases/${caseId}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ displayName: payload.displayName }),
+  })
+  return mapCaseRecord(data)
+}
+
 export const deleteCaseSample = async (caseId: string, sampleId: string): Promise<void> => {
   await deleteRequest(`${API_BASE_URL}/cases/${caseId}/samples/${sampleId}`)
+}
+
+export const updateCaseSample = async (
+  caseId: string,
+  sampleId: string,
+  payload: { displayName: string; modality: Modality },
+): Promise<CaseRecord> => {
+  const data = await jsonRequest<any>(`${API_BASE_URL}/cases/${caseId}/samples/${sampleId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  })
+  return mapCaseRecord(data)
+}
+
+export const fetchSampleAnalysis = async (
+  caseId: string,
+  sampleId: string,
+): Promise<TissueAnalysis | null> => {
+  const response = await fetch(`${API_BASE_URL}/cases/${caseId}/samples/${sampleId}/analysis`)
+  if (!response.ok) {
+    if (response.status === 404) return null
+    const errorBody = await response.json().catch(() => null)
+    const message = errorBody?.message ?? '获取样例分析失败'
+    throw new Error(message)
+  }
+  const data = await response.json()
+  return data ?? null
 }
 
 export const deleteCaseReport = async (caseId: string, reportId: string): Promise<void> => {

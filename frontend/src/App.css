@@ -283,7 +283,7 @@
   cursor: col-resize;
   background: linear-gradient(90deg, rgba(188, 176, 158, 0.08), rgba(188, 176, 158, 0.28), rgba(188, 176, 158, 0.08));
   position: relative;
-  flex: 0 0 6px;
+  flex: 0 0 12px;
   border-radius: 999px;
   transition: background 0.25s ease, box-shadow 0.25s ease;
 }
@@ -310,7 +310,7 @@
 .sidebar__resizer::after {
   content: '';
   position: absolute;
-  inset: -10px;
+  inset: -12px;
   border-radius: 999px;
   background: radial-gradient(circle, rgba(221, 205, 184, 0.38) 0%, rgba(221, 205, 184, 0.16) 52%, rgba(221, 205, 184, 0) 70%);
   opacity: 0;
@@ -332,8 +332,8 @@
 }
 
 .canvas-page__layout.has-sidebar .sidebar__resizer {
-  width: 6px;
-  margin-left: 8px;
+  width: 12px;
+  margin-left: 12px;
 }
 
 .canvas {
@@ -370,7 +370,7 @@
 }
 
 .canvas-page__layout.has-sidebar {
-  grid-template-columns: auto 6px minmax(0, 1fr);
+  grid-template-columns: auto 12px minmax(0, 1fr);
   align-items: stretch;
 }
 

@@ -6,4 +6,5 @@ contextBridge.exposeInMainWorld('electronAPI', {
   close: () => ipcRenderer.invoke('window:close'),
   platform: process.platform,
   openSampleImport: () => ipcRenderer.invoke('samples:open-dialog'),
+  openPath: (absPath) => ipcRenderer.invoke('system:open-path', absPath),
 })

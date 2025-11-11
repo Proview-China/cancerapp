@@ -4,7 +4,7 @@ import { AnalysisSidebar } from './components/AnalysisSidebar'
 import { PreferencesSidebar } from './components/PreferencesSidebar'
 import { PreferencesContent, type PreferencePage } from './components/PreferencesContent'
 import { CasesWorkspace } from './components/CasesWorkspace'
-import type { CaseCreateSample, CaseRecord, CaseReportDraft } from './types/cases'
+import type { CaseCreateSample, CaseRecord, CaseReportDraft, Modality } from './types/cases'
 import {
   fetchCases,
   createCase,
@@ -13,10 +13,12 @@ import {
   createCaseReport,
   updateCaseReport,
   deleteCaseReport,
+  updateCase,
+  updateCaseSample,
 } from './services/caseService'
 
-const MIN_SIDEBAR_WIDTH = 360
-const MAX_SIDEBAR_WIDTH = 420
+const MIN_SIDEBAR_WIDTH = 420
+const MAX_SIDEBAR_WIDTH = 720
 
 type PageKey = 'analysis' | 'data' | 'tasks' | 'preferences'
 
@@ -271,6 +273,11 @@ function App() {
     [cases, selectedCaseId],
   )
 
+  const handleRenameCase = useCallback(async (caseId: string, displayName: string) => {
+    const updated = await updateCase(caseId, { displayName })
+    setCases((prev) => prev.map((item) => (item.id === caseId ? updated : item)))
+  }, [])
+
   const handleDeleteSample = useCallback(
     async (caseId: string, sampleId: string) => {
       await deleteCaseSample(caseId, sampleId)
@@ -288,6 +295,22 @@ function App() {
       })
     },
     [selectedSampleId],
+  )
+
+  const handleUpdateSample = useCallback(
+    async (caseId: string, sampleId: string, payload: { displayName: string; modality: Modality }) => {
+      const updatedCase = await updateCaseSample(caseId, sampleId, payload)
+      setCases((prev) => prev.map((item) => (item.id === caseId ? updatedCase : item)))
+      setSelectedCaseId((current) => current ?? caseId)
+      setSelectedSampleId((current) => {
+        if (current !== sampleId) {
+          return current
+        }
+        const match = updatedCase.samples.find((sample) => sample.id === sampleId)
+        return match ? match.id : current
+      })
+    },
+    [],
   )
 
   const handleDeleteReport = useCallback(async (caseId: string, reportId: string) => {
@@ -408,7 +431,7 @@ function App() {
                     className={['canvas-page__layout', hasSidebar ? 'has-sidebar' : 'no-sidebar'].join(' ')}
                     style={{
                       gridTemplateColumns: hasSidebar && sidebarWidth
-                        ? `${Math.max(MIN_SIDEBAR_WIDTH, sidebarWidth)}px 6px minmax(0, 1fr)`
+                        ? `${Math.min(Math.max(MIN_SIDEBAR_WIDTH, sidebarWidth), MAX_SIDEBAR_WIDTH)}px 12px minmax(0, 1fr)`
                         : undefined,
                     }}
                   >
@@ -426,7 +449,9 @@ function App() {
                             onImportCase={handleImportCase}
                             onDeleteCase={handleDeleteCase}
                             onDeleteSample={handleDeleteSample}
+                            onUpdateSample={handleUpdateSample}
                             onDeleteReport={handleDeleteReport}
+                            onRenameCase={handleRenameCase}
                             onCreateReport={handleCreateReport}
                             onUpdateReport={handleUpdateReport}
                             isImporting={importingCase}
@@ -455,9 +480,18 @@ function App() {
                           selectedCaseId={selectedCaseId}
                           selectedSampleId={selectedSampleId}
                           selectedReportId={selectedReportId}
+                          onUpdateReport={handleUpdateReport}
+                          rightMode="analysis"
                         />
                       ) : item.key === 'data' ? (
-                        <span className="canvas-page__title">分析</span>
+                        <CasesWorkspace
+                          cases={cases}
+                          selectedCaseId={selectedCaseId}
+                          selectedSampleId={selectedSampleId}
+                          selectedReportId={selectedReportId}
+                          onUpdateReport={handleUpdateReport}
+                          rightMode="ai"
+                        />
                       ) : item.key === 'tasks' ? (
                         <span className="canvas-page__title">任务</span>
                       ) : null}
