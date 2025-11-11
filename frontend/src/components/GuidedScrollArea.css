@@ -124,7 +124,7 @@
   opacity: 1;
   transform: none;
   top: 8px;
-  right: 10px;   /* 靠右显示在火山口与外框之间 */
+  right: -12px;   /* 滚动条外置，保持内容宽度一致 */
   bottom: 16px;  /* 不越过侧栏底部 */
 }
 

@@ -2,9 +2,15 @@ import { Router } from 'express'
 import multer from 'multer'
 import crypto from 'node:crypto'
 import { pool } from '../db/pool.js'
-import { ensureCaseReportsTable } from '../db/init.js'
+import { ensureCaseReportsTable, ensureSampleTissueAnalysisTable } from '../db/init.js'
 import { storeFile, sanitizeSegment, deleteStoredFile } from '../utils/fileStorage.js'
-import type { CaseReportRecord, CaseSampleRecord, CaseWithRelations, Modality } from '../types.js'
+import type {
+  CaseReportRecord,
+  CaseSampleRecord,
+  CaseWithRelations,
+  Modality,
+  TissueAnalysis,
+} from '../types.js'
 
 const allowedModalities: Modality[] = ['组织切片', 'CT片', '核磁共振片']
 
@@ -48,6 +54,7 @@ const mapSamples = (rows: Array<Record<string, unknown>>): CaseSampleRecord[] =>
     checksum: (row.checksum as string | null) ?? null,
     created_at: String(row.created_at),
     updated_at: String(row.updated_at),
+    analysis: undefined,
   }))
 
 const mapReports = (rows: Array<Record<string, unknown>>): CaseReportRecord[] =>
@@ -126,6 +133,16 @@ const parseMetadata = (value: unknown) => {
   return value as Record<string, unknown>
 }
 
+const parseModality = (value: unknown) => {
+  if (typeof value !== 'string') {
+    throw new HttpError(400, 'modality 必须是字符串')
+  }
+  if (!allowedModalities.includes(value as Modality)) {
+    throw new HttpError(400, '不支持的 modality')
+  }
+  return value as Modality
+}
+
 type ReportPayload = {
   title: string
   summary: string | null
@@ -179,6 +196,32 @@ const normalizeReportForPatch = (input: unknown): ReportPatchPayload => {
 
   if (hasOwn(data, 'metadata')) {
     result.metadata = parseMetadata(data.metadata)
+    touched += 1
+  }
+
+  if (touched === 0) {
+    throw new HttpError(400, '需要至少提供一个可更新字段')
+  }
+
+  return result
+}
+
+const normalizeSampleForPatch = (input: unknown) => {
+  if (!isPlainObject(input)) {
+    throw new HttpError(400, '影像样例参数格式错误')
+  }
+
+  const data = input as Record<string, unknown>
+  const result: { description?: string; modality?: Modality } = {}
+  let touched = 0
+
+  if (hasOwn(data, 'displayName')) {
+    result.description = parseNonEmptyString(data.displayName, 'displayName', 200)
+    touched += 1
+  }
+
+  if (hasOwn(data, 'modality')) {
+    result.modality = parseModality(data.modality)
     touched += 1
   }
 
@@ -243,9 +286,78 @@ const fetchRowsByCaseIds = async (table: 'case_samples' | 'case_reports', ids: s
   return result.rows
 }
 
+const fetchCaseWithRelations = async (caseId: string): Promise<CaseWithRelations | null> => {
+  const caseResult = await pool.query('SELECT * FROM cases WHERE id = $1', [caseId])
+  if (caseResult.rowCount === 0) {
+    return null
+  }
+
+  const row = caseResult.rows[0]
+  const [samplesResult, reportsResult] = await Promise.all([
+    pool.query('SELECT * FROM case_samples WHERE case_id = $1 ORDER BY created_at DESC', [caseId]),
+    pool.query('SELECT * FROM case_reports WHERE case_id = $1 ORDER BY created_at DESC', [caseId]),
+  ])
+
+  const samples = mapSamples(samplesResult.rows)
+  const tissueSampleIds = samples.filter((s) => s.modality === '组织切片').map((s) => s.id)
+
+  if (tissueSampleIds.length > 0) {
+    const placeholders = tissueSampleIds.map((_, i) => `$${i + 1}`).join(', ')
+    const analysisResult = await pool.query(
+      `SELECT * FROM sample_tissue_analysis WHERE sample_id IN (${placeholders})`,
+      tissueSampleIds,
+    )
+    const bySampleId = new Map<string, TissueAnalysis>()
+    for (const r of analysisResult.rows) {
+      bySampleId.set(String(r.sample_id), {
+        raw: {
+          pos_cells_1_weak: r.pos_cells_1_weak ?? null,
+          pos_cells_2_moderate: r.pos_cells_2_moderate ?? null,
+          pos_cells_3_strong: r.pos_cells_3_strong ?? null,
+          iod_total_cells: r.iod_total_cells ?? null,
+          positive_area_mm2: r.positive_area_mm2 ?? null,
+          tissue_area_mm2: r.tissue_area_mm2 ?? null,
+          positive_area_px: r.positive_area_px ?? null,
+          tissue_area_px: r.tissue_area_px ?? null,
+          positive_intensity: r.positive_intensity ?? null,
+        },
+        derived: {
+          positive_cells_ratio: r.positive_cells_ratio ?? null,
+          positive_cells_density: r.positive_cells_density ?? null,
+          mean_density: r.mean_density ?? null,
+          h_score: r.h_score ?? null,
+          irs: r.irs ?? null,
+        },
+        images: {
+          raw_image_path: r.raw_image_path ?? null,
+          parsed_image_path: r.parsed_image_path ?? null,
+        },
+        metadata: r.metadata ?? {},
+      })
+    }
+    for (const s of samples) {
+      if (s.modality === '组织切片') {
+        s.analysis = bySampleId.get(s.id) ?? null
+      }
+    }
+  }
+
+  return {
+    id: row.id,
+    identifier: row.identifier,
+    display_name: row.display_name,
+    notes: row.notes,
+    metadata: row.metadata ?? {},
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+    samples,
+    reports: mapReports(reportsResult.rows),
+  }
+}
+
 casesRouter.get('/', async (_req, res) => {
   try {
-    await ensureCaseReportsTable()
+    await Promise.all([ensureCaseReportsTable(), ensureSampleTissueAnalysisTable()])
     const casesResult = await pool.query('SELECT * FROM cases ORDER BY created_at DESC')
     const caseRows = casesResult.rows
 
@@ -274,6 +386,50 @@ casesRouter.get('/', async (_req, res) => {
         reportsMap.set(report.case_id, [])
       }
       reportsMap.get(report.case_id)!.push(report)
+    }
+
+    // 关联组织切片分析
+    const allSamples = Array.from(samplesMap.values()).flat()
+    const tissueSampleIdsAll = allSamples.filter((s) => s.modality === '组织切片').map((s) => s.id)
+    if (tissueSampleIdsAll.length > 0) {
+      const placeholders = tissueSampleIdsAll.map((_, i) => `$${i + 1}`).join(', ')
+      const analysisResult = await pool.query(
+        `SELECT * FROM sample_tissue_analysis WHERE sample_id IN (${placeholders})`,
+        tissueSampleIdsAll,
+      )
+      const bySampleId = new Map<string, TissueAnalysis>()
+      for (const r of analysisResult.rows) {
+        bySampleId.set(String(r.sample_id), {
+          raw: {
+            pos_cells_1_weak: r.pos_cells_1_weak ?? null,
+            pos_cells_2_moderate: r.pos_cells_2_moderate ?? null,
+            pos_cells_3_strong: r.pos_cells_3_strong ?? null,
+            iod_total_cells: r.iod_total_cells ?? null,
+            positive_area_mm2: r.positive_area_mm2 ?? null,
+            tissue_area_mm2: r.tissue_area_mm2 ?? null,
+            positive_area_px: r.positive_area_px ?? null,
+            tissue_area_px: r.tissue_area_px ?? null,
+            positive_intensity: r.positive_intensity ?? null,
+          },
+          derived: {
+            positive_cells_ratio: r.positive_cells_ratio ?? null,
+            positive_cells_density: r.positive_cells_density ?? null,
+            mean_density: r.mean_density ?? null,
+            h_score: r.h_score ?? null,
+            irs: r.irs ?? null,
+          },
+          images: {
+            raw_image_path: r.raw_image_path ?? null,
+            parsed_image_path: r.parsed_image_path ?? null,
+          },
+          metadata: r.metadata ?? {},
+        })
+      }
+      for (const sample of allSamples) {
+        if (sample.modality === '组织切片') {
+          sample.analysis = bySampleId.get(sample.id) ?? null
+        }
+      }
     }
 
     const data: CaseWithRelations[] = caseRows.map((row) => ({
@@ -493,6 +649,55 @@ casesRouter.delete('/:caseId', async (req, res) => {
   }
 })
 
+casesRouter.patch('/:caseId/samples/:sampleId', async (req, res) => {
+  const { caseId, sampleId } = req.params
+
+  try {
+    await assertCaseExists(caseId)
+    const existing = await pool.query('SELECT id FROM case_samples WHERE id = $1 AND case_id = $2', [sampleId, caseId])
+    if (existing.rowCount === 0) {
+      throw new HttpError(404, '影像样例不存在')
+    }
+
+    const payload = normalizeSampleForPatch(req.body)
+    const assignments: string[] = []
+    const values: unknown[] = []
+
+    if (Object.prototype.hasOwnProperty.call(payload, 'description')) {
+      assignments.push(`description = $${assignments.length + 1}`)
+      values.push(payload.description)
+    }
+
+    if (Object.prototype.hasOwnProperty.call(payload, 'modality')) {
+      assignments.push(`modality = $${assignments.length + 1}`)
+      values.push(payload.modality)
+    }
+
+    assignments.push('updated_at = NOW()')
+    values.push(caseId, sampleId)
+
+    const caseIndex = values.length - 1
+    const sampleIndex = values.length
+
+    const updateSql = `UPDATE case_samples SET ${assignments.join(', ')} WHERE case_id = $${caseIndex} AND id = $${sampleIndex}`
+    await pool.query(updateSql, values)
+
+    const updated = await fetchCaseWithRelations(caseId)
+    if (!updated) {
+      throw new HttpError(500, '更新影像样例失败')
+    }
+
+    res.json(updated)
+  } catch (error) {
+    if (error instanceof HttpError) {
+      res.status(error.status).json({ message: error.message })
+      return
+    }
+    console.error('更新影像样例失败', error)
+    res.status(500).json({ message: '更新影像样例失败' })
+  }
+})
+
 casesRouter.delete('/:caseId/samples/:sampleId', async (req, res) => {
   const { caseId, sampleId } = req.params
 
@@ -525,6 +730,90 @@ casesRouter.delete('/:caseId/samples/:sampleId', async (req, res) => {
     res.status(500).json({ message: '删除样例失败' })
   } finally {
     client.release()
+  }
+})
+
+casesRouter.patch('/:caseId', async (req, res) => {
+  const { caseId } = req.params
+  const { displayName } = req.body ?? {}
+
+  try {
+    await ensureCaseReportsTable()
+    await assertCaseExists(caseId)
+
+    const normalizedName = parseNonEmptyString(displayName, 'displayName', 120)
+    await pool.query('UPDATE cases SET display_name = $1, updated_at = NOW() WHERE id = $2', [normalizedName, caseId])
+    const updated = await fetchCaseWithRelations(caseId)
+
+    if (!updated) {
+      res.status(404).json({ message: '病例不存在' })
+      return
+    }
+
+    res.json(updated)
+  } catch (error) {
+    if (error instanceof HttpError) {
+      res.status(error.status).json({ message: error.message })
+      return
+    }
+    console.error('更新病例失败', error)
+    res.status(500).json({ message: '更新病例失败' })
+  }
+})
+
+// GET /cases/:caseId/samples/:sampleId/analysis
+casesRouter.get('/:caseId/samples/:sampleId/analysis', async (req, res) => {
+  const { caseId, sampleId } = req.params
+  try {
+    await ensureSampleTissueAnalysisTable()
+
+    // 校验样本归属与模态
+    const sampleResult = await pool.query('SELECT * FROM case_samples WHERE id = $1 AND case_id = $2', [sampleId, caseId])
+    if (sampleResult.rowCount === 0) {
+      res.status(404).json({ message: '样例不存在' })
+      return
+    }
+    const sample = sampleResult.rows[0]
+    if (sample.modality !== '组织切片') {
+      res.status(403).json({ message: '该样例类型不支持此分析' })
+      return
+    }
+
+    const analysisResult = await pool.query('SELECT * FROM sample_tissue_analysis WHERE sample_id = $1', [sampleId])
+    if (analysisResult.rowCount === 0) {
+      res.json(null)
+      return
+    }
+    const r = analysisResult.rows[0]
+    const payload: TissueAnalysis = {
+      raw: {
+        pos_cells_1_weak: r.pos_cells_1_weak ?? null,
+        pos_cells_2_moderate: r.pos_cells_2_moderate ?? null,
+        pos_cells_3_strong: r.pos_cells_3_strong ?? null,
+        iod_total_cells: r.iod_total_cells ?? null,
+        positive_area_mm2: r.positive_area_mm2 ?? null,
+        tissue_area_mm2: r.tissue_area_mm2 ?? null,
+        positive_area_px: r.positive_area_px ?? null,
+        tissue_area_px: r.tissue_area_px ?? null,
+        positive_intensity: r.positive_intensity ?? null,
+      },
+      derived: {
+        positive_cells_ratio: r.positive_cells_ratio ?? null,
+        positive_cells_density: r.positive_cells_density ?? null,
+        mean_density: r.mean_density ?? null,
+        h_score: r.h_score ?? null,
+        irs: r.irs ?? null,
+      },
+      images: {
+        raw_image_path: r.raw_image_path ?? null,
+        parsed_image_path: r.parsed_image_path ?? null,
+      },
+      metadata: r.metadata ?? {},
+    }
+    res.json(payload)
+  } catch (error) {
+    console.error('获取样例分析失败', error)
+    res.status(500).json({ message: '获取样例分析失败' })
   }
 })
 

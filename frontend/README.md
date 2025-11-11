@@ -1,22 +1,22 @@
-# CancerApp — React + Tauri 桌面环境
+# CancerApp — 前端（React + Vite + Electron）
 
-轻量化但功能齐全的桌面应用脚手架，前端基于 React + Vite，后端采用 Tauri (Rust)。默认提供前后端通信示例、完善的构建脚本以及跨平台打包能力。
+基于 React 19 + Vite 7 的前端，桌面容器采用 Electron。提供病例导入与分析展示 UI。
 
 ## 快速开始
 
 ```bash
 cd frontend
 npm install
-npm run tauri:dev
+npm run electron:dev
 ```
 
-开发模式会同时启动 Vite 开发服务器与 Tauri 桌面容器，支持热重载与 Rust 命令调试。
+开发模式会同时启动 Vite 与 Electron，支持热重载。
 
 ## 常用脚本
 
-- `npm run dev`：仅启动前端 Vite 站点，适合纯前端调试。
-- `npm run tauri:dev`：启动完整的 Tauri 桌面应用。
-- `npm run tauri:build`：打包生成跨平台安装包。
+- `npm run dev`：仅启动 Vite（浏览器预览）。
+- `npm run electron:dev`：启动 Electron 桌面应用。
+- `npm run electron:build`：打包桌面应用。
 - `npm run lint`：使用 ESLint 校验前端代码质量。
 
 ## 目录结构
@@ -25,20 +25,12 @@ npm run tauri:dev
 .
 ├── public/            # 静态资源
 ├── src/               # React + TypeScript UI 代码
-├── src-tauri/
-│   ├── src/main.rs    # Tauri 主进程与命令定义
-│   ├── Cargo.toml     # Rust 依赖与构建配置
-│   └── tauri.conf.json# 桌面应用元信息与打包配置
 └── vite.config.ts     # Vite 配置
 ```
 
-## Rust 命令示例
-
-`src/App.tsx` 中的表单会通过 `invoke('greet')` 调用 Rust 命令，并在 UI 上展示返回结果。可以在 `src-tauri/src/main.rs` 中添加更多命令，扩展业务逻辑。
-
 ## 打包提示
 
-首次执行 `npm run tauri:build` 时，Rust 会为当前平台下载构建依赖。若需多平台打包，可在对应操作系统上运行同一命令，或配置 CI/CD 构建流程。
+首次执行 `npm run electron:build` 会构建桌面应用安装包，建议在目标平台上打包。
 
 ## 病例导入（影像 + 文字）演示流程
 
@@ -56,15 +48,54 @@ npm run tauri:dev
 
 ## UI 细节规范（update-ui-detail-polish）
 
-- 侧边栏最小宽度：360px（与 `MIN_SIDEBAR_WIDTH` 一致）。
-  - Analysis 侧栏：`.analysis-sidebar { min-width: 360px; }`
-  - Preferences 侧栏：`.preferences-sidebar { min-width: 360px; }`
-  - 栅格列宽在运行时同样使用 `Math.max(MIN_SIDEBAR_WIDTH, sidebarWidth)` 约束，确保任何情况下不低于阈值。
-- 卡片/列表排版：
-  - 标题字号/粗细：`font-size: 1rem; font-weight: 600`（如 `.report-item__title`）。
-  - 摘要双行截断：`display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;`（如 `.report-item__summary`）。
-  - 操作区对齐与间距：按钮组右对齐（`margin-left: auto`），按钮间距 `8px`（如 `.report-item__actions`）。
-- 验证与审计：
+- 侧边栏宽度保护：最小 420px、最大 720px（`MIN_SIDEBAR_WIDTH` / `MAX_SIDEBAR_WIDTH`）。
+  - `.analysis-sidebar`、`.preferences-sidebar` 使用相同的 `min-width` 与 `max-width`。
+  - 栅格列宽在运行时通过 `Math.min(Math.max(MIN, width), MAX)` clamp，拖拽不会压缩至导致排版错位。
+  - 顶置区域与滚动区域宽度一致，`GuidedScrollArea` 滚动条固定在最右侧且不影响外侧手柄命中。
+- 分屏与拖拽：
+  - 病例预览区中置竖向手柄（`case-split-handle`），可拖拽或使用左右箭头微调；手柄高度约为容器 50%。
+  - 左右面板宽度按比例存储，最小 35%、最大 75%，防止分析面板过窄。
+- 快速导入：侧栏顶置按钮合并为“快速导入”，弹出面板仅包含“图像”“文字”两项，进入后沿用既有导入流程。
+- 病例卡重构：
+  - 主区按钮仅保留“编辑”“删除”“展开/收起”，编辑仅修改病例名称。
+  - 展开后分为“图像”“文字”两个框，各自具备“新增”“展开/收起”按钮，靠右排列并随文字长度自适应。
+  - Emoji 与“未设置显示名称”文案移除，统一使用中文标签。
+- 缩略图与列表排版：
+  - 图像缩略图在 `case-panel__media-thumb` 中等比缩放（最长边 ≤ 20px），完整展示全貌、不裁剪。
+  - 标题字号/粗细统一为 `1rem / 600`，摘要沿用双行截断（`-webkit-line-clamp: 2`），操作区固定间距 8px 并右对齐。
+- 预览主题：图像与文字预览标题栏统一使用 `var(--panel-gradient)`，Markdown 区域与图像预览采用一致的暖色背景。
+- 验证与审计建议：
   - 构建：`cd frontend && npm run build`
   - 预览：`npm run preview -- --port 5173`
-  - 监视：使用 Playwright MCP 访问 `http://localhost:5173`，检查侧边栏 `min-width=360px`、标题字号/粗细、摘要截断与操作区对齐。
+  - 监视（Playwright MCP）：
+    1. 拖拽侧栏与中部手柄，确认 clamp 与命中区域。
+    2. 展开病例后核查“图像/文字”两框的“新增”“展开/收起”、缩略图比例与按钮对齐。
+    3. 验证病例重命名流程（编辑 → 保存），列表与预览同步更新。
+---
+
+## 分析区（四池塘）与外部打开
+
+- 分析区展示四类信息：基础、原始（a–i 指标）、处理后（a–e 指标）、AI 文本（Markdown）。
+- “查看原始图像/解析图像”按钮通过 Electron 打开系统默认图片查看器；在纯浏览器环境会提示不支持外部打开。
+- 空值显示“未提供”，数字统一精度与单位格式化。
+
+## 配置与后端联通
+
+- `VITE_API_BASE_URL` 指向后端地址，默认 `http://localhost:4000`。
+- 请先按 `backend/README.md` 初始化数据库并运行 Demo 种子（F10/F11/F13）。
+
+## Demo 数据来源
+
+- `demo_fake/BIOBANK-F10|F11|F13`：包含原始/解析图像与文本文件，前端不直接渲染解析图，只提供外部打开按钮。
+## 图像总结（复合热力图 + 多层级环形图）
+
+- 复合热力图
+  - 行=指标；列=“医生判断维度”（归一/十分位/z分/|z|/分位/Q组/排名/正偏/负偏/IQR位/置信/稳定/权重/完备）。
+  - 病例隔离：统计口径仅在当前病例样本内；样本过少时 z 分回退为归一。
+  - 视觉：单元格白色网格，确定性微抖动（仅影响显示）避免大片连片；图例与画布居中，无横向滚动。
+
+- 多层级环形图
+  - 中心风险仪表 + 风险分层 + 特征贡献 + 分位细分 + HSI 组成 + 缺失率。
+  - 与热力图统一色表；图形与图例居中显示，拖拽左右分隔手柄/缩放窗口时实时居中。
+
+实现细节见 `frontend/src/components/VisualizationPanel.tsx`。

@@ -48,7 +48,9 @@ type AnalysisSidebarProps = {
   }) => Promise<void>
   onDeleteCase: (caseId: string) => Promise<void>
   onDeleteSample: (caseId: string, sampleId: string) => Promise<void>
+  onUpdateSample: (caseId: string, sampleId: string, payload: { displayName: string; modality: Modality }) => Promise<void>
   onDeleteReport: (caseId: string, reportId: string) => Promise<void>
+  onRenameCase: (caseId: string, displayName: string) => Promise<void>
   onCreateReport: (caseId: string, payload: CaseReportDraft) => Promise<void>
   onUpdateReport: (caseId: string, reportId: string, payload: CaseReportDraft) => Promise<void>
   isImporting?: boolean
@@ -109,7 +111,9 @@ export const AnalysisSidebar = ({
   onImportCase,
   onDeleteCase,
   onDeleteSample,
+  onUpdateSample,
   onDeleteReport,
+  onRenameCase,
   onCreateReport,
   onUpdateReport,
   isImporting = false,
@@ -127,9 +131,16 @@ export const AnalysisSidebar = ({
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [expandedCaseIds, setExpandedCaseIds] = useState<Set<string>>(new Set())
   const [togglingCaseIds, setTogglingCaseIds] = useState<Set<string>>(new Set())
+  const [expandedImagePanels, setExpandedImagePanels] = useState<Set<string>>(new Set())
+  const [expandedTextPanels, setExpandedTextPanels] = useState<Set<string>>(new Set())
+  const [renameTarget, setRenameTarget] = useState<{ id: string; identifier: string; value: string } | null>(null)
+  const [renameError, setRenameError] = useState<string | null>(null)
+  const [isRenamingCase, setIsRenamingCase] = useState(false)
+  const [showQuickImportMenu, setShowQuickImportMenu] = useState(false)
   const infoWarningTimeout = useRef<number | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const reportFileInputRef = useRef<HTMLInputElement>(null)
+  const quickImportRef = useRef<HTMLDivElement>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [confirmClosing, setConfirmClosing] = useState(false)
@@ -138,8 +149,47 @@ export const AnalysisSidebar = ({
   const [reportEditor, setReportEditor] = useState<ReportEditorState | null>(null)
   const [reportEditorError, setReportEditorError] = useState<string | null>(null)
   const [isReportSaving, setIsReportSaving] = useState(false)
+  const [sampleEditor, setSampleEditor] = useState<
+    { caseId: string; sampleId: string; value: string; modality: Modality }
+    | null
+  >(null)
+  const [sampleEditorError, setSampleEditorError] = useState<string | null>(null)
+  const [isSampleSaving, setIsSampleSaving] = useState(false)
 
   const caseCountBadge = useMemo(() => cases.reduce((acc, item) => acc + item.samples.length, 0), [cases])
+
+  const closeQuickImportMenu = useCallback(() => {
+    setShowQuickImportMenu(false)
+  }, [])
+
+  useEffect(() => {
+    if (!showQuickImportMenu) {
+      return
+    }
+
+    const handleClickOutside = (event: MouseEvent) => {
+      if (!quickImportRef.current) {
+        return
+      }
+      if (!quickImportRef.current.contains(event.target as Node)) {
+        closeQuickImportMenu()
+      }
+    }
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        closeQuickImportMenu()
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    document.addEventListener('keydown', handleEscape)
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+      document.removeEventListener('keydown', handleEscape)
+    }
+  }, [closeQuickImportMenu, showQuickImportMenu])
 
   const resetModalState = useCallback(() => {
     setIdentifierValue('')
@@ -152,13 +202,24 @@ export const AnalysisSidebar = ({
     setErrorMessage(null)
     setShowInfoWarning(false)
     setActiveSampleMenu(null)
+    closeQuickImportMenu()
     if (fileInputRef.current) {
       fileInputRef.current.value = ''
     }
     if (reportFileInputRef.current) {
       reportFileInputRef.current.value = ''
     }
-  }, [])
+  }, [closeQuickImportMenu])
+
+  const handleQuickImportSelect = useCallback(
+    (mode: 'images' | 'text') => {
+      setImportTab(mode)
+      setIdentifierValue('')
+      closeQuickImportMenu()
+      setShowImportModal(true)
+    },
+    [closeQuickImportMenu],
+  )
 
   const handleCloseImport = useCallback(() => {
     setIsClosingImport(true)
@@ -432,40 +493,148 @@ export const AnalysisSidebar = ({
     }
   }, [handleCloseImport, identifierValue, onImportCase, pendingReports, pendingSamples, triggerInfoWarning])
 
-  const handleCaseClick = useCallback(
+  const ensurePanelsExpanded = useCallback((caseId: string) => {
+    setExpandedImagePanels((prev) => {
+      if (prev.has(caseId)) {
+        return prev
+      }
+      const next = new Set(prev)
+      next.add(caseId)
+      return next
+    })
+    setExpandedTextPanels((prev) => {
+      if (prev.has(caseId)) {
+        return prev
+      }
+      const next = new Set(prev)
+      next.add(caseId)
+      return next
+    })
+  }, [])
+
+  const animateCaseToggle = useCallback((caseId: string) => {
+    setTogglingCaseIds((prev) => {
+      const next = new Set(prev)
+      next.add(caseId)
+      return next
+    })
+    window.setTimeout(() => {
+      setTogglingCaseIds((prev) => {
+        const next = new Set(prev)
+        next.delete(caseId)
+        return next
+      })
+    }, 220)
+  }, [])
+
+  const handleCaseToggleExpand = useCallback(
+    (caseId: string) => {
+      setExpandedCaseIds((prev) => {
+        const next = new Set(prev)
+        if (next.has(caseId)) {
+          next.delete(caseId)
+        } else {
+          next.add(caseId)
+          ensurePanelsExpanded(caseId)
+        }
+        return next
+      })
+      animateCaseToggle(caseId)
+    },
+    [animateCaseToggle, ensurePanelsExpanded],
+  )
+
+  const handleCaseSelect = useCallback(
     (caseId: string) => {
       onSelectCase(caseId)
       setExpandedCaseIds((prev) => {
+        if (prev.has(caseId)) {
+          return prev
+        }
         const next = new Set(prev)
-        if (next.has(caseId) && selectedCaseId === caseId) {
+        next.add(caseId)
+        return next
+      })
+      ensurePanelsExpanded(caseId)
+    },
+    [ensurePanelsExpanded, onSelectCase],
+  )
+
+  const togglePanelExpansion = useCallback((caseId: string, panel: 'images' | 'text') => {
+    if (panel === 'images') {
+      setExpandedImagePanels((prev) => {
+        const next = new Set(prev)
+        if (next.has(caseId)) {
           next.delete(caseId)
         } else {
           next.add(caseId)
         }
         return next
       })
-
-      setTogglingCaseIds((prev) => {
+    } else {
+      setExpandedTextPanels((prev) => {
         const next = new Set(prev)
-        next.add(caseId)
+        if (next.has(caseId)) {
+          next.delete(caseId)
+        } else {
+          next.add(caseId)
+        }
         return next
       })
-      window.setTimeout(() => {
-        setTogglingCaseIds((prev) => {
-          const next = new Set(prev)
-          next.delete(caseId)
-          return next
-        })
-      }, 220)
-    },
-    [onSelectCase, selectedCaseId],
-  )
+    }
+  }, [])
+
+  const openCaseRenameDialog = useCallback((caseItem: CaseRecord) => {
+    setRenameTarget({
+      id: caseItem.id,
+      identifier: caseItem.identifier,
+      value: caseItem.displayName ?? caseItem.identifier,
+    })
+    setRenameError(null)
+  }, [])
+
+  const closeCaseRenameDialog = useCallback(() => {
+    setRenameTarget(null)
+    setRenameError(null)
+  }, [])
+
+  const handleRenameSubmit = useCallback(async () => {
+    if (!renameTarget) {
+      return
+    }
+
+    const nextName = renameTarget.value.trim()
+    if (!nextName) {
+      setRenameError('病例名称不能为空')
+      return
+    }
+
+    setIsRenamingCase(true)
+    try {
+      await onRenameCase(renameTarget.id, nextName)
+      closeCaseRenameDialog()
+    } catch (error) {
+      console.error('重命名病例失败', error)
+      setRenameError(error instanceof Error ? error.message : '重命名失败，请稍后重试')
+    } finally {
+      setIsRenamingCase(false)
+    }
+  }, [closeCaseRenameDialog, onRenameCase, renameTarget])
 
   const handleSampleClick = useCallback(
     (caseId: string, sampleId: string) => {
       onSelectCase(caseId)
       onSelectSample(caseId, sampleId)
-      setExpandedCaseIds((prev) => new Set(prev).add(caseId))
+      setExpandedCaseIds((prev) => {
+        const next = new Set(prev)
+        next.add(caseId)
+        return next
+      })
+      setExpandedImagePanels((prev) => {
+        const next = new Set(prev)
+        next.add(caseId)
+        return next
+      })
     },
     [onSelectCase, onSelectSample],
   )
@@ -474,7 +643,16 @@ export const AnalysisSidebar = ({
     (caseId: string, reportId: string) => {
       onSelectCase(caseId)
       onSelectReport(caseId, reportId)
-      setExpandedCaseIds((prev) => new Set(prev).add(caseId))
+      setExpandedCaseIds((prev) => {
+        const next = new Set(prev)
+        next.add(caseId)
+        return next
+      })
+      setExpandedTextPanels((prev) => {
+        const next = new Set(prev)
+        next.add(caseId)
+        return next
+      })
     },
     [onSelectCase, onSelectReport],
   )
@@ -483,6 +661,21 @@ export const AnalysisSidebar = ({
     setConfirmMessage(message)
     confirmActionRef.current = action
     setConfirmOpen(true)
+  }, [])
+
+  const openSampleEditor = useCallback((caseItem: CaseRecord, sample: CaseRecord['samples'][number]) => {
+    setSampleEditor({
+      caseId: caseItem.id,
+      sampleId: sample.id,
+      value: sample.displayName || sample.originalFilename,
+      modality: sample.modality,
+    })
+    setSampleEditorError(null)
+  }, [])
+
+  const closeSampleEditor = useCallback(() => {
+    setSampleEditor(null)
+    setSampleEditorError(null)
   }, [])
 
   const closeConfirm = useCallback(() => {
@@ -590,116 +783,223 @@ export const AnalysisSidebar = ({
     }
   }, [closeReportEditor, onCreateReport, onUpdateReport, reportEditor])
 
-  const renderSampleList = (caseItem: CaseRecord) => {
-    if (!caseItem.samples.length) {
-      return null
+  const handleSampleEditorSubmit = useCallback(async () => {
+    if (!sampleEditor) return
+    const trimmedName = sampleEditor.value.trim()
+    if (!trimmedName) {
+      setSampleEditorError('名称不能为空')
+      return
     }
-    return (
-      <div className="case-card__samples">
-        {caseItem.samples.map((sample) => {
-          const isSampleActive = caseItem.id === selectedCaseId && selectedSampleId === sample.id
-          return (
-            <div key={sample.id} className={['case-card__sample', isSampleActive ? 'is-active' : ''].join(' ').trim()}>
-              <button type="button" className="case-card__sample-main" onClick={() => handleSampleClick(caseItem.id, sample.id)}>
-                <span
-                  className="case-card__sample-thumb"
-                  style={{
-                    backgroundImage: `url(${sample.thumbnailUrl ?? sample.imageUrl})`,
-                  }}
-                />
-                <span className="case-card__sample-text">
-                  <strong>{sample.displayName || sample.originalFilename}</strong>
-                  <span>{sample.modality}</span>
-                </span>
-              </button>
-              <div className="case-card__sample-actions">
-                <button type="button" className="case-card__sample-action" disabled>
-                  修改
-                </button>
-                <button
-                  type="button"
-                  className="case-card__sample-action case-card__sample-action--danger"
-                  onClick={(event) => {
-                    event.stopPropagation()
-                    handleSampleDelete(caseItem, sample.id)
-                  }}
-                >
-                  删除
-                </button>
-              </div>
-            </div>
-          )
-        })}
-      </div>
-    )
-  }
+    setSampleEditorError(null)
+    setIsSampleSaving(true)
+    try {
+      await onUpdateSample(sampleEditor.caseId, sampleEditor.sampleId, {
+        displayName: trimmedName,
+        modality: sampleEditor.modality,
+      })
+      closeSampleEditor()
+    } catch (error) {
+      console.error('更新影像样例失败', error)
+      setSampleEditorError(error instanceof Error ? error.message : '保存失败，请稍后重试')
+    } finally {
+      setIsSampleSaving(false)
+    }
+  }, [closeSampleEditor, onUpdateSample, sampleEditor])
 
-  const renderReportList = (caseItem: CaseRecord) => (
-    <div className="case-card__reports-block">
-      <div className="case-card__section-header">
-        <span>文字病历（{caseItem.reports.length}）</span>
-        <button
-          type="button"
-          className="pond-button pond-button--tiny"
-          onClick={(event) => {
-            event.stopPropagation()
-            openReportEditor({ caseId: caseItem.id })
-          }}
-        >
-          新建文字
-        </button>
-      </div>
-      {caseItem.reports.length === 0 ? (
-        <p className="case-card__reports-empty">暂无文字记录</p>
-      ) : (
-        <div className="case-card__reports">
-          {caseItem.reports.map((report) => {
-            const isActive = caseItem.id === selectedCaseId && selectedReportId === report.id
-            return (
-              <div key={report.id} className={['report-item', isActive ? 'is-active' : ''].join(' ').trim()}>
-                <button
-                  type="button"
-                  className="report-item__main"
-                  onClick={() => handleReportClick(caseItem.id, report.id)}
-                >
-                  <div className="report-item__title">{report.title}</div>
-                  <p className="report-item__summary">{report.summary ?? '—'}</p>
-                </button>
-                <div className="report-item__actions">
-                  <button
-                    type="button"
-                    className="report-item__action"
-                    onClick={(event) => {
-                      event.stopPropagation()
-                      openReportEditor({
-                        caseId: caseItem.id,
-                        reportId: report.id,
-                        title: report.title,
-                        summary: report.summary ?? '',
-                        tags: report.tags,
-                        content: report.content,
-                      })
-                    }}
-                  >
-                    编辑
-                  </button>
-                  <button
-                    type="button"
-                    className="report-item__action report-item__action--danger"
-                    onClick={(event) => {
-                      event.stopPropagation()
-                      handleReportDelete(caseItem, report.id)
-                    }}
-                  >
-                    删除
-                  </button>
-                </div>
-              </div>
-            )
-          })}
+  const renderImagePanel = (caseItem: CaseRecord, expanded: boolean) => (
+    <section
+      className={[
+        'case-panel',
+        'case-panel--images',
+        expanded ? 'is-expanded' : 'is-collapsed',
+      ]
+        .join(' ')
+        .trim()}
+    >
+      <div className="case-panel__header">
+        <h4 className="case-panel__title">图像</h4>
+        <div className="case-panel__actions">
+          <button
+            type="button"
+            className="case-panel__action"
+            disabled={isImporting}
+            onClick={(event) => {
+              event.stopPropagation()
+              setIdentifierValue(caseItem.identifier)
+              setImportTab('images')
+              setShowImportModal(true)
+            }}
+          >
+            新增
+          </button>
+          <button
+            type="button"
+            className="case-panel__action case-panel__action--ghost"
+            onClick={(event) => {
+              event.stopPropagation()
+              togglePanelExpansion(caseItem.id, 'images')
+            }}
+          >
+            {expanded ? '收起' : '展开'}
+          </button>
         </div>
-      )}
-    </div>
+      </div>
+      {expanded ? (
+        <div className="case-panel__body case-panel__body--images">
+          {caseItem.samples.length === 0 ? (
+            <p className="case-panel__empty">暂无图像内容</p>
+          ) : (
+            caseItem.samples.map((sample) => {
+              const isSampleActive = caseItem.id === selectedCaseId && selectedSampleId === sample.id
+              return (
+                <div
+                  key={sample.id}
+                  className={['case-panel__media-item', isSampleActive ? 'is-active' : '']
+                    .join(' ')
+                    .trim()}
+                >
+                  <button
+                    type="button"
+                    className="case-panel__media-main"
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      handleSampleClick(caseItem.id, sample.id)
+                    }}
+                  >
+                    <span className="case-panel__media-thumb">
+                      <img
+                        src={sample.thumbnailUrl ?? sample.imageUrl}
+                        alt={sample.displayName ?? sample.originalFilename}
+                        loading="lazy"
+                      />
+                    </span>
+                    <span className="case-panel__media-text">
+                      <strong>{sample.displayName || sample.originalFilename}</strong>
+                      <span>{sample.modality}</span>
+                    </span>
+                  </button>
+                  <div className="case-panel__media-actions">
+                    <button
+                      type="button"
+                      className="case-panel__media-action"
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        openSampleEditor(caseItem, sample)
+                      }}
+                    >
+                      编辑
+                    </button>
+                    <button
+                      type="button"
+                      className="case-panel__media-action case-panel__media-action--danger"
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        handleSampleDelete(caseItem, sample.id)
+                      }}
+                    >
+                      删除
+                    </button>
+                  </div>
+                </div>
+              )
+            })
+          )}
+        </div>
+      ) : null}
+    </section>
+  )
+
+  const renderTextPanel = (caseItem: CaseRecord, expanded: boolean) => (
+    <section
+      className={[
+        'case-panel',
+        'case-panel--text',
+        expanded ? 'is-expanded' : 'is-collapsed',
+      ]
+        .join(' ')
+        .trim()}
+    >
+      <div className="case-panel__header">
+        <h4 className="case-panel__title">文字</h4>
+        <div className="case-panel__actions">
+          <button
+            type="button"
+            className="case-panel__action"
+            onClick={(event) => {
+              event.stopPropagation()
+              openReportEditor({ caseId: caseItem.id })
+            }}
+          >
+            新增
+          </button>
+          <button
+            type="button"
+            className="case-panel__action case-panel__action--ghost"
+            onClick={(event) => {
+              event.stopPropagation()
+              togglePanelExpansion(caseItem.id, 'text')
+            }}
+          >
+            {expanded ? '收起' : '展开'}
+          </button>
+        </div>
+      </div>
+      {expanded ? (
+        <div className="case-panel__body case-panel__body--text">
+          {caseItem.reports.length === 0 ? (
+            <p className="case-panel__empty">暂无文字记录</p>
+          ) : (
+            caseItem.reports.map((report) => {
+              const isActive = caseItem.id === selectedCaseId && selectedReportId === report.id
+              return (
+                <div key={report.id} className={['report-item', isActive ? 'is-active' : ''].join(' ').trim()}>
+                  <button
+                    type="button"
+                    className="report-item__main"
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      handleReportClick(caseItem.id, report.id)
+                    }}
+                  >
+                    <div className="report-item__title">{report.title}</div>
+                    <p className="report-item__summary">{report.summary ?? '—'}</p>
+                  </button>
+                  <div className="report-item__actions">
+                    <button
+                      type="button"
+                      className="report-item__action"
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        openReportEditor({
+                          caseId: caseItem.id,
+                          reportId: report.id,
+                          title: report.title,
+                          summary: report.summary ?? '',
+                          tags: report.tags,
+                          content: report.content,
+                        })
+                      }}
+                    >
+                      编辑
+                    </button>
+                    <button
+                      type="button"
+                      className="report-item__action report-item__action--danger"
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        handleReportDelete(caseItem, report.id)
+                      }}
+                    >
+                      删除
+                    </button>
+                  </div>
+                </div>
+              )
+            })
+          )}
+        </div>
+      ) : null}
+    </section>
   )
 
   const renderImportModal = () => (
@@ -930,7 +1230,7 @@ export const AnalysisSidebar = ({
           </header>
 
           <div className="modal-editor__grid">
-            <label className="modal-editor__field">
+            <label className="modal-editor__field modal-editor__field--title">
               <span>标题</span>
               <input
                 type="text"
@@ -940,7 +1240,7 @@ export const AnalysisSidebar = ({
               />
             </label>
 
-            <label className="modal-editor__field">
+            <label className="modal-editor__field modal-editor__field--summary">
               <span>摘要</span>
               <textarea
                 rows={3}
@@ -950,7 +1250,7 @@ export const AnalysisSidebar = ({
               />
             </label>
 
-            <label className="modal-editor__field">
+            <label className="modal-editor__field modal-editor__field--tags">
               <span>标签（以逗号或空格分隔）</span>
               <input
                 type="text"
@@ -1003,19 +1303,53 @@ export const AnalysisSidebar = ({
             >
               {cases.length > 0 && cases.every((c) => expandedCaseIds.has(c.id)) ? '全部收起' : '全部展开'}
             </button>
-            <button type="button" className="pond-button--compact" onClick={() => {
-              setImportTab('images')
-              setShowImportModal(true)
-            }}>
-              导入影像
-            </button>
-            <button type="button" className="pond-button--compact" onClick={() => {
-              setImportTab('text')
-              setShowImportModal(true)
-            }}>
-              导入文字
-            </button>
-            <button type="button" className="pond-button--compact" onClick={() => setShowSearchModal(true)}>
+            <div
+              className={['analysis-quick-import', showQuickImportMenu ? 'is-open' : ''].join(' ').trim()}
+              ref={quickImportRef}
+            >
+              <button
+                type="button"
+                className="pond-button--compact"
+                aria-haspopup="true"
+                aria-expanded={showQuickImportMenu}
+                aria-controls="analysis-quick-import-menu"
+                onClick={() => setShowQuickImportMenu((prev) => !prev)}
+              >
+                快速导入
+              </button>
+              {showQuickImportMenu ? (
+                <div
+                  id="analysis-quick-import-menu"
+                  className="analysis-quick-import__menu"
+                  role="menu"
+                >
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => handleQuickImportSelect('images')}
+                    disabled={isImporting}
+                  >
+                    图像
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => handleQuickImportSelect('text')}
+                    disabled={isImporting}
+                  >
+                    文字
+                  </button>
+                </div>
+              ) : null}
+            </div>
+            <button
+              type="button"
+              className="pond-button--compact"
+              onClick={() => {
+                closeQuickImportMenu()
+                setShowSearchModal(true)
+              }}
+            >
               搜索
             </button>
           </div>
@@ -1030,6 +1364,8 @@ export const AnalysisSidebar = ({
                 const isActive = caseItem.id === selectedCaseId
                 const isExpanded = expandedCaseIds.has(caseItem.id)
                 const isToggling = togglingCaseIds.has(caseItem.id)
+                const imagesExpanded = expandedImagePanels.has(caseItem.id)
+                const textExpanded = expandedTextPanels.has(caseItem.id)
                 return (
                   <div
                     key={caseItem.id}
@@ -1038,57 +1374,58 @@ export const AnalysisSidebar = ({
                       .trim()}
                   >
                     <div className="case-card__header">
-                      <button type="button" className="case-card__main" onClick={() => handleCaseClick(caseItem.id)}>
+                      <button
+                        type="button"
+                        className="case-card__main"
+                        onClick={(event) => {
+                          event.stopPropagation()
+                          handleCaseSelect(caseItem.id)
+                        }}
+                      >
                         <div className="case-card__title-row">
                           <span className="case-card__name">{caseItem.identifier}</span>
-                          <span className="case-card__count" title="影像样例数量">
-                            📷 {caseItem.samples.length}
-                          </span>
-                          <span className="case-card__count case-card__count--reports" title="文字病历数量">
-                            ✍️ {caseItem.reports.length}
-                          </span>
                         </div>
-                        <div className="case-card__meta">{caseItem.displayName ?? '未设置显示名称'}</div>
+                        {caseItem.displayName ? (
+                          <div className="case-card__meta case-card__meta--alias">{caseItem.displayName}</div>
+                        ) : null}
                       </button>
-                      <div className="case-card__actions-row">
+                      <div className="case-card__actions-row case-card__actions-row--primary">
                         <button
                           type="button"
-                          className="pond-button pond-button--tiny"
+                          className="case-card__action"
                           onClick={(event) => {
                             event.stopPropagation()
-                            setIdentifierValue(caseItem.identifier)
-                            setImportTab('images')
-                            setShowImportModal(true)
+                            openCaseRenameDialog(caseItem)
                           }}
                         >
-                          新增样例
+                          编辑
                         </button>
                         <button
                           type="button"
-                          className="pond-button pond-button--tiny"
-                          onClick={(event) => {
-                            event.stopPropagation()
-                            openReportEditor({ caseId: caseItem.id })
-                          }}
-                        >
-                          新增文字
-                        </button>
-                        <button
-                          type="button"
-                          className="pond-button pond-button--tiny pond-button--danger"
+                          className="case-card__action case-card__action--danger"
                           onClick={(event) => {
                             event.stopPropagation()
                             handleCaseDelete(caseItem)
                           }}
                         >
-                          删除病例
+                          删除
+                        </button>
+                        <button
+                          type="button"
+                          className="case-card__action"
+                          onClick={(event) => {
+                            event.stopPropagation()
+                            handleCaseToggleExpand(caseItem.id)
+                          }}
+                        >
+                          {isExpanded ? '收起' : '展开'}
                         </button>
                       </div>
                     </div>
                     {isExpanded ? (
                       <div className="case-card__body">
-                        {renderSampleList(caseItem)}
-                        {renderReportList(caseItem)}
+                        {renderImagePanel(caseItem, imagesExpanded)}
+                        {renderTextPanel(caseItem, textExpanded)}
                       </div>
                     ) : null}
                   </div>
@@ -1100,7 +1437,110 @@ export const AnalysisSidebar = ({
       </aside>
 
       {showImportModal && renderImportModal()}
-      {renderReportEditorModal()}
+            {renderReportEditorModal()}
+            {sampleEditor ? (
+              <div className="modal-overlay" onClick={closeSampleEditor}>
+                <div className="modal-volcano modal-volcano--editor" onClick={(event) => event.stopPropagation()}>
+                  <header className="modal-editor__header">
+              <div>
+                <p className="modal-editor__eyebrow">编辑影像样例</p>
+                <h2>设置样例名称与类别</h2>
+              </div>
+              <button type="button" className="modal-close-button" aria-label="关闭" onClick={closeSampleEditor} />
+                  </header>
+            <div className="modal-editor__grid modal-editor__grid--sample">
+              <label className="modal-editor__field modal-editor__field--title">
+                <span>名称</span>
+                <input
+                  type="text"
+                  value={sampleEditor.value}
+                  placeholder="请输入样例名称"
+                  onChange={(event) =>
+                    setSampleEditor((prev) => (prev ? { ...prev, value: event.target.value } : prev))
+                  }
+                />
+              </label>
+              <label className="modal-editor__field modal-editor__field--summary">
+                <span>类别</span>
+                <div className="modal-sample-editor__modality">
+                  <select
+                    value={sampleEditor.modality}
+                    onChange={(event) =>
+                      setSampleEditor((prev) =>
+                        prev
+                          ? {
+                              ...prev,
+                              modality: event.target.value as Modality,
+                            }
+                          : prev,
+                      )
+                    }
+                  >
+                    {MODALITIES.map((option) => (
+                      <option key={option} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </label>
+            </div>
+            {sampleEditorError ? <p className="modal-volcano__error">{sampleEditorError}</p> : null}
+            <div className="modal-volcano__actions modal-editor__actions">
+              <button type="button" className="pond-button pond-button--ghost" onClick={closeSampleEditor} disabled={isSampleSaving}>
+                取消
+              </button>
+              <button type="button" className="pond-button" onClick={handleSampleEditorSubmit} disabled={isSampleSaving}>
+                {isSampleSaving ? '保存中…' : '保存'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {renameTarget ? (
+        <div className="modal-overlay" onClick={closeCaseRenameDialog}>
+          <div className="modal-volcano modal-volcano--editor" onClick={(event) => event.stopPropagation()}>
+            <header className="modal-editor__header">
+              <div>
+                <p className="modal-editor__eyebrow">编辑病例</p>
+                <h2>更新病例名称</h2>
+              </div>
+              <button type="button" className="modal-close-button" aria-label="关闭" onClick={closeCaseRenameDialog} />
+            </header>
+
+            <div className="modal-editor__grid">
+              <label className="modal-editor__field">
+                <span>病例标识</span>
+                <input type="text" value={renameTarget.identifier} disabled />
+              </label>
+              <label className="modal-editor__field">
+                <span>病例名称</span>
+                <input
+                  type="text"
+                  value={renameTarget.value}
+                  placeholder="请输入病例名称"
+                  onChange={(event) =>
+                    setRenameTarget((prev) => (prev ? { ...prev, value: event.target.value } : prev))
+                  }
+                  autoFocus
+                />
+              </label>
+            </div>
+
+            {renameError ? <p className="modal-volcano__error">{renameError}</p> : null}
+
+            <div className="modal-volcano__actions">
+              <button type="button" className="pond-button pond-button--ghost" onClick={closeCaseRenameDialog} disabled={isRenamingCase}>
+                取消
+              </button>
+              <button type="button" className="pond-button" onClick={handleRenameSubmit} disabled={isRenamingCase}>
+                {isRenamingCase ? '保存中…' : '保存'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {confirmOpen && (
         <div className={`modal-overlay ${confirmClosing ? 'is-closing' : ''}`} onClick={closeConfirm}>

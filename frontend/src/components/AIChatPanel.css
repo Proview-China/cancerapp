@@ -1,0 +1,212 @@
+.ai-chat {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  gap: 12px;
+}
+
+.ai-chat__messages {
+  flex: 1;
+  overflow: auto;
+  padding: 14px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ai-bubble {
+  max-width: 74%;
+  padding: 12px 14px;
+  border-radius: 16px;
+  line-height: 1.6;
+  word-break: break-word;
+  overflow: hidden; /* 内容严格限制在气泡内 */
+  background: var(--panel-gradient);
+  color: var(--text-primary);
+  box-shadow:
+    2px 2px 6px rgba(163, 150, 130, 0.15),
+    -2px -2px 6px rgba(255, 255, 255, 0.8),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5);
+}
+
+.ai-bubble--assistant { align-self: flex-start; }
+.ai-bubble--user { align-self: flex-end; opacity: 0.96; }
+
+.ai-bubble__attachments {
+  margin-top: 6px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.ai-chip {
+  font-size: 12px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: rgba(0,0,0,0.06);
+}
+
+.ai-chat__composer {
+  position: sticky; /* 还原钉底行为 */
+  bottom: 0;
+  display: block;
+  z-index: 1;
+}
+
+/* 待发送附件预览区 */
+.ai-pending {
+  display: flex;
+  gap: 10px;
+  padding: 6px 4px 8px;
+}
+
+.ai-pending__item {
+  position: relative;
+  width: 120px;
+  height: 120px;
+  border-radius: 14px;
+  overflow: hidden;
+  background: #e6e0d6;
+  box-shadow:
+    0 2px 6px rgba(0,0,0,0.1),
+    inset 0 1px 0 rgba(255,255,255,0.5);
+}
+
+.ai-pending__thumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.ai-pending__file {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  text-align: center;
+  background: var(--panel-gradient);
+  color: var(--text-primary);
+  font-size: 12px;
+}
+
+.ai-pending__remove {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  border: none;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  cursor: pointer;
+}
+.ai-pending__remove:hover { filter: brightness(1.05); }
+.ai-pending__remove:active { transform: translateY(1px); }
+
+.ai-pending__clip {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,0,0,0.45);
+  color: #fff;
+  font-size: 12px;
+}
+
+.ai-composer__shell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--panel-gradient);
+  border-radius: 999px;
+  padding: 8px 56px 8px 12px;
+  color: var(--text-primary);
+  box-shadow:
+    inset 4px 4px 10px rgba(163, 150, 130, 0.22),
+    inset -4px -4px 10px rgba(255, 255, 255, 0.75);
+}
+
+.ai-add-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  border: none;
+  background: linear-gradient(180deg, #fefcf6 0%, #efe9dd 60%, #e7dfd1 100%);
+  color: var(--text-primary);
+  font-size: 22px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.ai-add-btn:hover { filter: brightness(1.02); }
+.ai-add-btn:active { transform: translateY(1px); }
+
+.ai-chat__input {
+  width: 100%;
+  height: 36px;
+  border-radius: 999px;
+  border: none;
+  background: transparent;
+  padding: 0 8px;
+  outline: none;
+  color: var(--text-primary);
+}
+
+.ai-chat__input::placeholder { color: var(--text-secondary); }
+
+.ai-chat__toolbar {
+  display: flex;
+  gap: 8px;
+}
+
+.ai-send-btn {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  border: none;
+  background: var(--panel-gradient);
+  color: var(--text-primary);
+  font-size: 18px;
+  cursor: pointer;
+  box-shadow:
+    2px 2px 6px rgba(163, 150, 130, 0.15),
+    -2px -2px 6px rgba(255, 255, 255, 0.8),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5);
+}
+
+.ai-send-btn:hover { filter: brightness(1.02); }
+.ai-send-btn:active { transform: translateY(1px); }
+
+/* Markdown 渲染更小的字体并处理元素约束 */
+.ai-markdown {
+  font-size: 0.92em; /* 小一点 */
+  line-height: 1.6;
+}
+.ai-markdown h1,
+.ai-markdown h2,
+.ai-markdown h3,
+.ai-markdown h4,
+.ai-markdown h5,
+.ai-markdown h6 { margin: 0.4em 0 0.3em; font-size: 1em; font-weight: 600; }
+.ai-markdown p,
+.ai-markdown ul,
+.ai-markdown ol,
+.ai-markdown table { margin: 0.4em 0; }
+.ai-markdown img { max-width: 100%; height: auto; display: block; border-radius: 6px; }
+.ai-markdown pre { white-space: pre-wrap; margin: 0.4em 0; }
+.ai-markdown code { white-space: pre-wrap; }

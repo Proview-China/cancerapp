@@ -21,6 +21,13 @@ node_modules
 uploads/
 electron-v33.2.0-linux-x64/
 pictures/
+claude/
+# Local dev secrets and assistants
+backend/.env
+frontend/.env
+.claude/
+# 允许提交 OpenSpec 规范与变更
+!openspec/**
 frontend/.vite/
 
 # Large local docs not for VCS
