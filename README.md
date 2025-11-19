@@ -1,58 +1,70 @@
-# CancerApp（桌面端：React + Vite + Electron；后端：Express + PostgreSQL）
+# CancerApp（桌面端 + 微信小程序）
 
-面向肿瘤病理影像管理与可视化分析的桌面应用。支持病例导入（图像/文字）、组织切片分析 Demo、以及“图像总结”高信息密度可视化（复合热力图 + 多层级环形图）。
+面向肿瘤病理影像管理与可视化分析的综合应用平台。包含桌面端管理后台（React + Vite + Electron）和微信小程序客户端（Taro + React）。
 
-## 功能亮点
-- 病例库：导入/管理图像样本与文字病历；Electron 外部打开原图/解析图。
-- 组织切片分析 Demo：后端种子脚本生成原始/衍生指标及图像路径；前端自动消费。
-- 图像总结（可视化）：
-  - 复合热力图：行=指标，列=“医生判断维度”（归一/十分位/z分/|z|/分位/Q组/排名/正偏/负偏/IQR位/置信/稳定/权重/完备）；病例内统计；白色网格与确定性微抖动避免色块连片；实时居中自适应。
-  - 多层级环形图：中心风险仪表 + 风险分层 + 特征贡献 + 分位细分 + HSI 组成 + 缺失率；与热力图统一配色、实时居中。
+## 核心功能
+
+### 1. 桌面端 (Electron)
+- **病例库管理**：导入/管理图像样本与文字病历。
+- **组织切片分析**：自动生成原始/衍生指标及图像路径。
+- **高密度可视化**：
+  - **复合热力图**：支持归一/十分位/z分等14种维度的实时分析。
+  - **多层级环形图**：集成风险仪表、特征贡献、HSI组成等多维数据。
+
+### 2. 微信小程序 (Taro)
+- **移动端查阅**：随时随地查看病例详情。
+- **AI 智能助手**：集成了 AI 对话功能，辅助医生进行病例分析。
+- **数据可视化**：在移动端完美复刻了桌面端的图表体验。
 
 ## 快速开始
-1) 安装依赖
+
+### 1. 安装依赖
 ```bash
-cd backend && npm i && cd ../frontend && npm i
+# 安装根目录依赖
+npm install
+
+# 安装各子项目依赖
+cd backend && npm install
+cd ../frontend && npm install
+cd ../wechatapp && npm install
 ```
-2) 初始化数据库（PostgreSQL）
-```bash
-psql postgresql://postgres:aass0371@localhost:5432/cancerapp -f database/schema.sql
-```
-3) 启动后端并导入 Demo
+
+### 2. 启动后端
 ```bash
 cd backend
-npm run dev &           # 开发模式
-npm run seed:demo       # 写入 demo_fake F10/F11/F13
+npm run dev             # 启动 API 服务
+npm run seed:demo       # (可选) 写入演示数据
 ```
-4) 启动前端（桌面/浏览器二选一）
+
+### 3. 启动前端
 ```bash
+# 桌面端
 cd frontend
-npm run electron:dev    # 桌面端（推荐）
-# 或
-npm run dev             # 浏览器预览
+npm run electron:dev
+
+# 微信小程序
+cd wechatapp
+npm run dev:weapp       # 编译并监听文件变化
+# 然后打开微信开发者工具，导入 wechatapp/dist 目录
 ```
 
-## 配置
-- 前端 API 地址：`VITE_API_BASE_URL`（默认 `http://localhost:4000`）。
-- 后端环境：`backend/.env`（`DATABASE_URL`、`UPLOADS_ROOT`、`PORT`）。
+## 目录结构
 
-## 可视化说明（图像总结）
-- 病例隔离：所有统计均在“当前病例”内完成；样本过少时 z 分回退为归一值。
-- 热力图列（判断维度）包括：归一/十分位/z分/|z|/分位/Q组/排名/正偏/负偏/IQR位/置信/稳定/权重/完备；单元格带白色网格，且应用确定性微抖动（仅影响显示，不改变数据）。
-- 实时居中：拖动左右分隔手柄或窗口缩放时，图表自动 `resize` 保持居中。
-
-## 规范与贡献
-- 遵循 OpenSpec 规范（`openspec/`）。重要改动需先提交变更提案并通过严格校验，实施后归档。
-- 本次实现对应归档变更：`openspec/changes/archive/2025-11-11-upgrade-analysis-heatmap-pie-ultra/`。
-
-## 目录结构（节选）
 ```
-backend/     # Express + pg 后端
-frontend/    # React + Vite + Electron 前端
-openspec/    # 规范与变更
-database/    # SQL 脚本
-demo_fake/   # 演示数据
+backend/      # Express + PostgreSQL 后端服务
+frontend/     # React + Vite + Electron 桌面端
+wechatapp/    # Taro + React 微信小程序
+openspec/     # 开发规范与变更记录
+database/     # 数据库 Schema 与脚本
+demo_fake/    # 演示用假数据
 ```
+
+## 团队协作说明
+
+本项目配置了严格的 `.gitignore` 规则：
+- **构建产物不上传**：`dist/`, `node_modules/` 等目录被忽略，确保每位开发者在本地构建干净的环境。
+- **私有文件不上传**：`.docx`, `.zip` 等敏感文档已被屏蔽。
+- **一致性保证**：只要拉取代码后执行 `npm install`，即可获得与主仓库完全一致的依赖环境。
 
 ## 许可
 详见 LICENSE。
