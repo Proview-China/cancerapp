@@ -1,0 +1,31 @@
+.page-case-detail {
+  padding: 32px 24px 120px;
+}
+
+.detail-header__title {
+  font-size: 48px;
+  font-weight: 600;
+}
+
+.detail-header__subtitle {
+  display: block;
+  color: #8f857f;
+  margin-top: 4px;
+}
+
+.detail-tabs {
+  display: flex;
+  gap: 24px;
+  margin: 24px 0;
+}
+
+.detail-tabs__item {
+  font-size: 30px;
+  padding-bottom: 8px;
+  color: #8f857f;
+}
+
+.detail-tabs__item--active {
+  color: #1f1a18;
+  border-bottom: 4px solid #1f1a18;
+}

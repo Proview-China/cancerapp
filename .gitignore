@@ -13,6 +13,9 @@ frontend/dist-ssr
 # Backend/build artifacts
 backend/node_modules
 backend/dist
+wechatapp/node_modules
+wechatapp/dist
+*.zip
 
 # Root dependencies/cache
 node_modules
@@ -30,6 +33,12 @@ frontend/.vite/
 *.docx
 *.local
 *.pdb
+
+# User specific ignores
+1.docx
+logo.png
+肝预.docx
+wechatapp.zip
 
 # Editor directories and files
 .vscode/*

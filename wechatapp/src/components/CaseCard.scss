@@ -1,0 +1,63 @@
+.case-card {
+  background: #fff9f2;
+  border-radius: 24px;
+  padding: 24px;
+  margin-bottom: 24px;
+  box-shadow: 0 12px 24px rgba(31, 26, 24, 0.08);
+}
+
+.case-card__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.case-card__title {
+  font-size: 34px;
+  font-weight: 600;
+}
+
+.case-card__subtitle {
+  margin-top: 4px;
+  display: block;
+  color: #8f857f;
+  font-size: 26px;
+}
+
+.case-card__actions {
+  display: flex;
+  gap: 16px;
+}
+
+.case-card__action {
+  color: #b46f5c;
+  font-size: 26px;
+}
+
+.case-card__section {
+  margin-top: 12px;
+}
+
+.case-card__section-title {
+  display: block;
+  font-weight: 600;
+  color: #b46f5c;
+  margin-bottom: 8px;
+}
+
+.case-card__item {
+  padding: 12px 0;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.case-card__item-title {
+  display: block;
+  font-size: 28px;
+}
+
+.case-card__item-subtitle {
+  display: block;
+  font-size: 24px;
+  color: #8f857f;
+}

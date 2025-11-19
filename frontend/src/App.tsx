@@ -372,9 +372,7 @@ function App() {
     <div className="app-shell">
       <header className="menubar">
         <div className="menubar__brand">
-          <span className="brand__logo" aria-hidden>
-            CA
-          </span>
+          <img src="/logo.png" alt="CancerApp logo" className="brand__img" />
           <div className="brand__text">
             <strong>CancerApp</strong>
             <span>临床智能工作台</span>

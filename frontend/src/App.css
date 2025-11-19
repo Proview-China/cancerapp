@@ -75,6 +75,15 @@
   letter-spacing: 0.05em;
 }
 
+/* Image-based logo displayed in the menubar */
+.brand__img {
+  height: 34px; /* +40% */
+  width: auto;
+  max-width: 220px;
+  display: block;
+  object-fit: contain;
+}
+
 .brand__text {
   display: flex;
   flex-direction: column;

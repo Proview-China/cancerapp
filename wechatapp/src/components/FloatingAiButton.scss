@@ -1,0 +1,17 @@
+.floating-ai-button {
+  position: fixed;
+  right: 32px;
+  bottom: 40px;
+  width: 96px;
+  height: 96px;
+  border-radius: 48px;
+  background: linear-gradient(135deg, #00c6ff 0%, #0072ff 100%);
+  color: #fff;
+  font-size: 32px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 10px 30px rgba(0, 114, 255, 0.35);
+  z-index: 99;
+}

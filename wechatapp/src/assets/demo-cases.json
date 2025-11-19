@@ -1,0 +1,65 @@
+[
+  {
+    "id": "case-demo-biobank-f13",
+    "identifier": "BIOBANK-F13",
+    "displayName": "BIOBANK-F13",
+    "notes": "演示案例，组织切片分析数据完整",
+    "metadata": {"cohort": "demo_fake"},
+    "createdAt": "2024-09-15T09:00:00.000Z",
+    "updatedAt": "2024-09-15T09:00:00.000Z",
+    "samples": [
+      {
+        "id": "sample-demo-1",
+        "caseId": "case-demo-biobank-f13",
+        "displayName": "组织切片",
+        "modality": "组织切片",
+        "originalFilename": "biobank-f13.png",
+        "imageUrl": "https://fake-static.cancerapp.dev/uploads/biobank-f13.png",
+        "thumbnailUrl": "https://fake-static.cancerapp.dev/uploads/biobank-f13-thumb.png",
+        "createdAt": "2024-09-15T09:00:00.000Z",
+        "updatedAt": "2024-09-15T09:00:00.000Z",
+        "analysis": {
+          "raw": {
+            "pos_cells_1_weak": 12.3,
+            "pos_cells_2_moderate": 33.5,
+            "pos_cells_3_strong": 42.1,
+            "iod_total_cells": 110.0,
+            "positive_area_mm2": 5.7,
+            "tissue_area_mm2": 65.2,
+            "positive_area_px": 15420,
+            "tissue_area_px": 210330,
+            "positive_intensity": 0.87
+          },
+          "derived": {
+            "positive_cells_ratio": 0.8791,
+            "positive_cells_density": 0.0875,
+            "mean_density": 0.09,
+            "h_score": 179,
+            "irs": 8
+          },
+          "images": {
+            "raw_image_path": "https://fake-static.cancerapp.dev/uploads/biobank-f13.png",
+            "parsed_image_path": "https://fake-static.cancerapp.dev/uploads/biobank-f13-parsed.png"
+          },
+          "metadata": {
+            "pathologist": "Dr. Demo",
+            "scanner": "Aperio"
+          }
+        }
+      }
+    ],
+    "reports": [
+      {
+        "id": "report-demo-1",
+        "caseId": "case-demo-biobank-f13",
+        "title": "出院随访计划",
+        "summary": "3 个月随访，必要时加做分子检测",
+        "content": "### 出院计划\n- 第 1 月进行肝功复查\n- 第 3 月评估影像及 H-Score\n- 若出现疼痛/发热应立即复诊",
+        "tags": ["随访", "建议"],
+        "metadata": {"author": "系统"},
+        "createdAt": "2024-09-15T09:00:00.000Z",
+        "updatedAt": "2024-09-15T09:00:00.000Z"
+      }
+    ]
+  }
+]

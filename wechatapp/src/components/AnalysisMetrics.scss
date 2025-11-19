@@ -1,0 +1,25 @@
+.analysis-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.analysis-metrics__cell {
+  background: #fffdf8;
+  border-radius: 18px;
+  padding: 20px;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.05);
+}
+
+.analysis-metrics__label {
+  display: block;
+  font-size: 24px;
+  color: #8f857f;
+  margin-bottom: 8px;
+}
+
+.analysis-metrics__value {
+  font-size: 32px;
+  font-weight: 600;
+  color: #1f1a18;
+}

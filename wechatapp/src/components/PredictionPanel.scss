@@ -1,0 +1,27 @@
+.prediction-panel {
+  background: #fffdf8;
+  border-radius: 24px;
+  padding: 28px;
+  box-shadow: 0 12px 24px rgba(31, 26, 24, 0.08);
+}
+
+.prediction-panel__title {
+  font-size: 34px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.prediction-panel__summary {
+  display: block;
+  color: #8f857f;
+  font-size: 26px;
+  margin-bottom: 16px;
+}
+
+.prediction-panel__paragraph {
+  display: block;
+  font-size: 26px;
+  line-height: 1.6;
+  margin-bottom: 12px;
+  color: #433934;
+}

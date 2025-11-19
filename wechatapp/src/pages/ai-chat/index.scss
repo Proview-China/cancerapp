@@ -1,0 +1,43 @@
+.page-ai-chat {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  padding: 24px;
+  box-sizing: border-box;
+}
+
+.chat-view {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 16px 0;
+}
+
+.chat-input {
+  background: #fff;
+  border-radius: 24px;
+  padding: 16px;
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  box-shadow: 0 4px 18px rgba(31, 26, 24, 0.18);
+}
+
+.chat-input textarea {
+  flex: 1;
+  min-height: 92px;
+  font-size: 28px;
+  border: none;
+}
+
+.chat-input__send {
+  width: 120px;
+  height: 72px;
+  border-radius: 36px;
+  background: #0072ff;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+}
