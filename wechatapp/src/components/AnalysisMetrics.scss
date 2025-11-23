@@ -1,25 +1,29 @@
 .analysis-metrics {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: var(--spacing-md);
 }
 
 .analysis-metrics__cell {
-  background: #fffdf8;
-  border-radius: 18px;
-  padding: 20px;
-  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.05);
+  @extend .card-surface;
+  padding: var(--spacing-md);
+  box-shadow:
+    0 12px 24px var(--shadow-outer),
+    inset 0 1px 0 rgba(255, 255, 255, 0.82),
+    inset 0 -3px 8px var(--shadow-inner-dark);
 }
 
 .analysis-metrics__label {
   display: block;
   font-size: 24px;
-  color: #8f857f;
-  margin-bottom: 8px;
+  color: var(--text-secondary);
+  margin-bottom: var(--spacing-xs);
 }
 
 .analysis-metrics__value {
   font-size: 32px;
-  font-weight: 600;
-  color: #1f1a18;
+  font-weight: var(--font-strong);
+  color: var(--text-primary);
+  letter-spacing: 0.01em;
 }
+@import '../styles/theme.scss';

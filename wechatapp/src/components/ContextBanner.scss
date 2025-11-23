@@ -1,18 +1,24 @@
 .context-banner {
-  background: rgba(0, 114, 255, 0.08);
-  border-radius: 20px;
-  padding: 20px 24px;
-  margin-bottom: 20px;
-  color: #0055b0;
+  @extend .card-surface;
+  padding: var(--spacing-md) var(--spacing-lg);
+  margin-bottom: var(--spacing-md);
+  color: var(--text-primary);
+  box-shadow:
+    0 12px 24px var(--shadow-outer),
+    inset 0 1px 0 rgba(255, 255, 255, 0.86),
+    inset 0 -4px 10px var(--shadow-inner-dark);
 }
 
 .context-banner__label {
   display: block;
-  font-weight: 600;
+  font-weight: var(--font-strong);
   margin-bottom: 6px;
+  letter-spacing: 0.01em;
 }
 
 .context-banner__description {
   display: block;
   font-size: 24px;
+  color: var(--text-secondary);
 }
+@import '../styles/theme.scss';

@@ -46,9 +46,11 @@ function IndexPage() {
   }
 
   return (
-    <View className='page-index'>
+    <View className='page-index page-shell'>
       <View className='index-header'>
-        <Text className='index-header__title'>病例库</Text>
+        <View className='index-header__top'>
+          <Text className='index-header__title'>病例库</Text>
+        </View>
         <Input
           className='index-header__search'
           placeholder='搜索病例编号'

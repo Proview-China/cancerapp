@@ -2,9 +2,11 @@
   width: 100%;
   text-align: center;
   padding: 40px 0;
-  color: #8f857f;
+  color: var(--text-secondary);
+  font-weight: var(--font-medium);
 }
 
 .state-hint--error {
   color: #c0392b;
 }
+@import '../styles/theme.scss';

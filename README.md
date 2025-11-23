@@ -46,6 +46,11 @@ npm run electron:dev
 cd wechatapp
 npm run dev:weapp       # 编译并监听文件变化
 # 然后打开微信开发者工具，导入 wechatapp/dist 目录
+
+# 移动竖屏 Web（独立只读版）
+cd frontend-mobile
+npm install
+npm run dev             # 竖屏浏览，横屏会显示提示遮罩
 ```
 
 ## 目录结构
@@ -68,4 +73,3 @@ demo_fake/    # 演示用假数据
 
 ## 许可
 详见 LICENSE。
-

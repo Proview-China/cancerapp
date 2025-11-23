@@ -1,0 +1,79 @@
+:root,
+page,
+body {
+  --app-background: #f5f5f0;
+  --panel-gradient: rgba(255, 255, 255, 0.4);
+  --panel-highlight: transparent;
+  --panel-bg: rgba(248, 248, 246, 0.5);
+  --shadow-outer: none;
+  --shadow-inner-dark: none;
+  --shadow-inner-light: none;
+  --accent-soft: #e2e0da;
+  --accent-strong: #d0c9bc;
+  --text-primary: #151515;
+  --text-secondary: rgba(21, 21, 21, 0.68);
+  --brand-gradient: #c1b19a;
+  --border-subtle: rgba(120, 110, 96, 0.12);
+  --radius-card: 12px;
+  --radius-pill: 999px;
+  --spacing-xs: 8px;
+  --spacing-sm: 12px;
+  --spacing-md: 16px;
+  --spacing-lg: 20px;
+  --spacing-xl: 24px;
+  --font-title: 600;
+  --font-strong: 700;
+  --font-medium: 500;
+  --font-regular: 400;
+  --transition-soft: all 0.18s ease;
+}
+
+.page-shell {
+  min-height: 100vh;
+  padding: calc(var(--spacing-xl) * 2 + 20px + env(safe-area-inset-top)) var(--spacing-lg) calc(110px + env(safe-area-inset-bottom));
+  background: var(--app-background);
+  color: var(--text-primary);
+  box-sizing: border-box;
+}
+
+.card-surface {
+  background: var(--panel-gradient);
+  border-radius: var(--radius-card);
+  box-shadow: none;
+  position: relative;
+  border: 1px solid rgba(150, 140, 126, 0.08);
+}
+
+.card-surface::after {
+  content: none;
+}
+
+.pond-surface {
+  background: var(--panel-bg);
+  border-radius: 12px;
+  box-shadow: none;
+  border: 1px solid rgba(150, 140, 126, 0.12);
+}
+
+.ghost-button {
+  min-width: 64px;
+  padding: 10px 14px;
+  border-radius: 14px;
+  border: 1px solid var(--border-subtle);
+  background: rgba(255, 255, 255, 0.65);
+  color: var(--text-primary);
+  font-weight: var(--font-medium);
+  box-shadow: none;
+  transition: var(--transition-soft);
+}
+
+.ghost-button:active {
+  transform: translateY(1px);
+  box-shadow: none;
+}
+
+.subtle-divider {
+  border: none;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(150, 140, 126, 0), rgba(150, 140, 126, 0.35), rgba(150, 140, 126, 0));
+}

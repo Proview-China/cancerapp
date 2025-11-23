@@ -1,14 +1,36 @@
+@import './styles/theme.scss';
+
+:root,
 page,
 body {
-  font-family: 'PingFang SC', 'Helvetica Neue', Arial, sans-serif;
-  background: #f6f1ea;
-  color: #1f1a18;
+  font-family:
+    'Iowan Old Style',
+    'Palatino Linotype',
+    'Book Antiqua',
+    'Palatino',
+    'Times New Roman',
+    'Source Han Serif SC',
+    'Noto Serif CJK SC',
+    'Songti SC',
+    'STSong',
+    'SimSun',
+    'SF Pro SC',
+    'PingFang SC',
+    serif;
+  background: var(--app-background);
+  color: var(--text-primary);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
 }
 
-view {
+view,
+text,
+input,
+textarea {
   box-sizing: border-box;
 }
 
 .container {
-  padding: 32px 24px 96px;
+  padding: calc(var(--spacing-xl) + env(safe-area-inset-top)) var(--spacing-lg)
+    calc(120px + env(safe-area-inset-bottom));
 }

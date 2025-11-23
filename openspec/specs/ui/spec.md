@@ -252,3 +252,82 @@ AI 池塘 MUST 支持 h2/h3、段落、无序列表、粗体、斜体；不渲�
 #### Scenario: Low-N masking
 - Then N<6 时不渲染显著性星标，但保留 ρ 数值与相应说明
 
+### Requirement: WeChat Miniapp Shell Read-only Experience
+项目 MUST 提供一个基于 Taro 的微信小程序壳，默认进入首页展示病历库列表，点击病例后进入仅含“分析数据”与“预测&建议”两个模块的详情页，并以 fake demo 数据只读展示。
+
+#### Scenario: Cases index as landing page
+- **WHEN** 打开小程序或返回首页
+- **THEN** 首屏展示病历库列表（含搜索/折叠控件），不渲染分析/预测内容，数据来源于现有 demo API
+
+#### Scenario: Case detail tabs
+- **WHEN** 用户在首页点击某个病例
+- **THEN** 跳转到病例详情页，顶部只有标题导航，主区域包含“分析数据”与“预测&建议”两个 Tab，内容与当前桌面端 demo 对齐
+
+### Requirement: AI Floating Button and Context Rules
+微信小程序壳 SHALL 在病历库页与病例详情页右下角展示悬浮 AI 按钮；从首页进入 AI 页面时不得附带病例上下文，而从详情页进入时 MUST 传递当前病例/样本的上下文参数。
+
+#### Scenario: Global AI entry from index
+- **WHEN** 在病历库首页点击悬浮 AI 按钮
+- **THEN** 跳转到 AI 对话页，显示“无上下文”提示且不会自动带入病例数据
+
+#### Scenario: Contextual AI entry from detail
+- **WHEN** 在病例详情页点击悬浮 AI 按钮
+- **THEN** 跳转 AI 对话页并附带当前病例/样本/报告摘要参数，界面提示“当前上下文：<病例>”，供后续 AI 识别
+
+### Requirement: Desktop Visual Parity and Mobile Adaptation
+微信小程序壳 MUST 复用桌面端的视觉/排版 token（色板、阴影、圆角、间距、字体粗细），并在微信安全区内保持只读展示的美术一致性，不新增编辑/导入能力。
+
+#### Scenario: Theme tokens and spacing applied
+- **WHEN** 渲染任何页面（首页/详情/AI）
+- **THEN** 背景使用桌面端暖米色渐变 `linear-gradient(135deg,#f1ede5,#ece6db,#f6f2ea)`，卡片/气泡使用统一阴影 `rgba(78,70,60,0.16)` + 内阴影，圆角 12–16，文字权重沿用桌面标题/副标题粗细（600–700 / 500），页面内边距遵循 12/16/24 间距并适配顶部/底部安全区，组件不贴边且不越过导航/手势区域
+
+#### Scenario: Cases index uses desktop card structure
+- **WHEN** 查看病例库首页
+- **THEN** 搜索条与卡片沿用桌面端圆角（14–16）与浅色阴影；卡片头显示 identifier + displayName（字重 600+），右侧轻量文字按钮；折叠区分“图像/文字”分组并展示数量/标题/摘要，分隔线使用浅棕透明线，与桌面端分组标题色一致；不展示分析内容且所有交互仅为查看/折叠/本地收藏状态
+
+#### Scenario: Case detail grid and tabs follow desktop layout
+- **WHEN** 查看病例详情页
+- **THEN** Tab 使用桌面端下划线/高亮样式；分析指标以 2–3 列栅格卡片呈现（副标题 + 数值 + 单位），卡片圆角 12–16、阴影同首页卡片，行高与间距与桌面一致；空态/加载态保持留白；预测&建议以卡片容器展示标题与段落行距（约 1.5x）、次文本色，且不引入编辑控件
+
+#### Scenario: AI chat banner and bubbles match warm aesthetic
+- **WHEN** 打开 AI 对话页
+- **THEN** 顶部上下文 Banner 采用暖色卡片（panel 渐变 + 阴影 + 圆角 12–14）+小图标/圆点提示病例/报告信息；气泡与输入区使用暖灰背景、轻阴影与圆角胶囊样式（圆角 12–16，间距 8–12），可加轻量渐变/纹理呼应“池塘/火山口”气质但不引入重型图形库；不使用默认白底圆形气泡，保持只读本地对话
+
+### Requirement: WeChat Miniapp Case Index Mirrors Desktop Cards
+WeChat 小程序病例列表页 SHALL 采用与桌面端左侧栏一致的卡片分组（病例→图像/文字分区）、操作（编辑/删除/收起）与操作区（全部收起、快速导入、搜索），并保持火山口/池塘视觉 token 与高保真字体。
+
+#### Scenario: Card grouping and controls
+- **GIVEN** 进入小程序病例列表页  
+- **WHEN** 查看任一病例卡  
+- **THEN** 显示图像分区与文字分区、每项含编辑/删除，病例卡可展开/收起，头部含“全部收起/快速导入/搜索”，且卡片渐变/阴影/圆角/字体与桌面一致。
+
+### Requirement: WeChat Miniapp Detail Tabs for Preview and Analysis
+病例详情页 MUST 提供“预览 | 数据分析”两段互斥 tab（不滚动切换），并复刻桌面右侧栏的全部信息块与顺序：基本信息 → 基础病理数据 → 分析数据 → 预测&建议；预览支持图片缩放/重置+缩略图或 Markdown 文本排版。
+
+#### Scenario: Preview tab
+- **GIVEN** 在病例详情页选择“预览”  
+- **WHEN** 当前样本为图片  
+- **THEN** 显示大图、缩放比例、重置按钮和缩略图浮窗，使用桌面同款视觉与字体；如为文本，则以 Markdown 标题/正文排版展示，文案与桌面一致。
+
+#### Scenario: Analysis tab card parity
+- **GIVEN** 在病例详情页选择“数据分析”  
+- **WHEN** 查看信息块  
+- **THEN** 以栅格卡片呈现“基本信息/基础病理数据/分析数据/预测&建议”且顺序保持；卡片尺寸/圆角/渐变/内外阴影、字号字重与桌面一致；所有字段与桌面文案全量显示，无裁剪。
+
+#### Scenario: Safe-area and keyboard fit
+- **GIVEN** 设备存在挖孔/顶部胶囊或底部 Home 条，且在详情页中使用输入控件（如 AI 悬浮按钮点击进入对话前键盘弹出）  
+- **THEN** 预览/分析区域与悬浮按钮不被遮挡，保留安全区内边距，键盘弹出时悬浮元素隐藏或上移，右上三点/关闭按钮可点击。
+
+### Requirement: WeChat Miniapp AI Dialog Parity with Shortcuts
+小程序 AI 对话页 SHALL 保留桌面 demo 文案与上下文 banner，支持附件按钮与快捷问题/预设，气泡含角色标签/时间/头像风格；入口为病例及列表页右下悬浮按钮。
+
+#### Scenario: Entry and context
+- **GIVEN** 在列表页或详情页点击 AI 悬浮按钮  
+- **WHEN** 打开 AI 对话页  
+- **THEN** 显示上下文 banner（含病例/报告摘要时展示），初始消息为桌面 demo 文案，输入区右侧含附件按钮，且气泡包含角色标签/时间/头像风格。
+
+#### Scenario: Shortcuts available
+- **GIVEN** 进入 AI 对话页  
+- **WHEN** 未输入文本  
+- **THEN** 可点击快捷问题/预设填充输入框或直接发送，发送后对话流按角色气泡渲染，键盘安全区适配。
+
