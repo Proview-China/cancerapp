@@ -39,8 +39,13 @@ export default defineConfig<{ env?: Record<string, any> }>(({ command, mode }) =
     }
   }
 
-  if (command === 'build' && mode === 'production') {
-    return Object.assign({}, baseConfig, prodConfig)
+  const targetConfig = command === 'build' && mode === 'production' ? prodConfig : devConfig
+  const miniBase = {
+    miniCssExtractPluginOption: {
+      ignoreOrder: true
+    }
   }
-  return Object.assign({}, baseConfig, devConfig)
+  const miniMerged = Object.assign({}, miniBase, targetConfig.mini ?? {})
+
+  return Object.assign({}, baseConfig, targetConfig, { mini: miniMerged })
 })

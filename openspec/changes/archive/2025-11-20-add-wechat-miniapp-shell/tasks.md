@@ -26,3 +26,19 @@
 - [x] 6.1 更新根 README（或新建 `wechatapp/README.md`），描述依赖安装、Taro CLI 要求、`npm run dev:weapp`/`build:weapp`、微信开发者工具导入步骤
 - [x] 6.2 运行 `openspec validate add-wechat-miniapp-shell --strict`
 - [x] 6.3 运行 Taro 构建/预览命令并记录输出（至少一次 `npm run dev:weapp` 或 `build:weapp`），确保壳可编译
+
+## 7. 视觉对齐（桌面端 → 小程序）
+- [x] 7.1 更新 OpenSpec（proposal/design/specs/ui）以定义桌面端视觉/排版 token 复用与只读约束
+- [x] 7.2 落地主题 token（色板/阴影/圆角/间距/字体）到 `theme.scss`/全局样式：
+  - 引入桌面端渐变/色值：`--app-background`, `--panel-gradient`, `--panel-highlight`, `--text-primary/#151515`, `--text-secondary/rgba(21,21,21,0.68)`, `--brand-gradient`, `--shadow-outer/rgba(78,70,60,0.16)`；圆角 12–16，间距 12/16/24，字重 600–700/500/400。
+  - 应用至页面：
+    1) 首页搜索条 + 卡片（头部 + 折叠分组“图像/文字”，分隔线浅棕透明）+ AI 浮窗胶囊。
+    2) 详情 Tab（下划线/高亮）、分析栅格卡片（2–3 列、数值+单位）、预测卡片（行距 1.5x），空态/加载态留白。
+    3) AI 页上下文 Banner（圆角 12–14，panel 渐变 + 图标）、气泡/输入区（暖灰背景、阴影、圆角 12–16，轻纹理可选）。
+  - 适配安全区：顶部/底部各留 16–20 px，浮窗/输入区不压手势条，滚动区上下留白。
+- [x] 7.3 截图与构建验证：
+  - 运行 `npm run build:weapp`（或 `npm run dev:weapp` 首次构建），确保无样式/编译错误。
+  - 截图 3 页：
+    1) 首页：搜索条 + 折叠卡片展开/收起各一张，显示暖色卡片与分组线。
+    2) 详情：分析 Tab（栅格卡片）+ 预测 Tab（卡片段落）各一张，含上下文标题/标签。
+    3) AI 页：Banner + 左右气泡 + 输入区，展示纹理/渐变与安全区留白。

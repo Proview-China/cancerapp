@@ -1,43 +1,106 @@
 .page-ai-chat {
   display: flex;
   flex-direction: column;
-  height: 100vh;
-  padding: 24px;
-  box-sizing: border-box;
+  gap: var(--spacing-md);
+  min-height: 100vh;
+}
+
+.chat-top {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+}
+
+.nav-back {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  background: transparent;
+  color: var(--text-primary);
+  flex-shrink: 0;
+}
+
+.nav-back__icon {
+  font-weight: var(--font-strong);
+  font-size: 30px;
+}
+
+.chat-shortcuts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 4px 0;
+}
+
+.chat-shortcuts__pill {
+  padding: 8px 12px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.75);
+  color: var(--text-primary);
+  border: 1px solid var(--border-subtle);
+  font-size: 24px;
+  box-shadow: none;
 }
 
 .chat-view {
   flex: 1;
   display: flex;
   flex-direction: column;
-  padding: 16px 0;
+  padding: var(--spacing-sm) 0;
+  gap: var(--spacing-sm);
 }
 
 .chat-input {
-  background: #fff;
-  border-radius: 24px;
-  padding: 16px;
+  @extend .card-surface;
+  padding: var(--spacing-md);
+  padding-bottom: calc(var(--spacing-md) + env(safe-area-inset-bottom));
   display: flex;
   align-items: flex-end;
-  gap: 12px;
-  box-shadow: 0 4px 18px rgba(31, 26, 24, 0.18);
+  gap: var(--spacing-sm);
+  box-shadow: none;
+  border: 1px solid rgba(120, 110, 96, 0.14);
+  position: sticky;
+  bottom: 0;
 }
 
-.chat-input textarea {
+.chat-input__attach {
+  width: 96px;
+  height: 72px;
+  border-radius: var(--radius-pill);
+  background: #f2f0eb;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(120, 110, 96, 0.16);
+  flex-shrink: 0;
+}
+
+.chat-input__textarea {
   flex: 1;
   min-height: 92px;
   font-size: 28px;
   border: none;
+  background: transparent;
+  color: var(--text-primary);
 }
 
 .chat-input__send {
   width: 120px;
   height: 72px;
-  border-radius: 36px;
-  background: #0072ff;
-  color: #fff;
+  border-radius: var(--radius-pill);
+  background: var(--brand-gradient);
+  color: #1f1a18;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 28px;
+  font-weight: var(--font-strong);
+  box-shadow: none;
+  flex-shrink: 0;
 }
+
+@import '../../styles/theme.scss';

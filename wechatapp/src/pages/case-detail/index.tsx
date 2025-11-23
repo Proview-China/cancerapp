@@ -3,13 +3,13 @@ import Taro, { useLoad, useRouter } from '@tarojs/taro'
 import { useEffect, useMemo, useState } from 'react'
 import { fetchCaseDetail } from '../../services/cases'
 import type { CaseRecord } from '../../types/cases'
-import { AnalysisMetrics } from '../../components/AnalysisMetrics'
-import { PredictionPanel } from '../../components/PredictionPanel'
+import { PreviewPanel } from '../../components/PreviewPanel'
+import { AnalysisPanel } from '../../components/AnalysisPanel'
 import { FloatingAiButton } from '../../components/FloatingAiButton'
 import { StateHint } from '../../components/StateHint'
 import './index.scss'
 
-type TabKey = 'analysis' | 'prediction'
+type TabKey = 'preview' | 'analysis'
 
 function CaseDetailPage() {
   const router = useRouter()
@@ -17,7 +17,7 @@ function CaseDetailPage() {
   const [record, setRecord] = useState<CaseRecord | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [tab, setTab] = useState<TabKey>('analysis')
+  const [tab, setTab] = useState<TabKey>('preview')
 
   useLoad(() => {
     setCaseId(router.params.caseId ?? null)
@@ -44,6 +44,14 @@ function CaseDetailPage() {
   const highlightedSample = useMemo(() => record?.samples?.[0], [record])
   const highlightedReport = useMemo(() => record?.reports?.[0], [record])
 
+  const handleBack = () => {
+    if (Taro.getCurrentPages().length > 1) {
+      Taro.navigateBack()
+    } else {
+      Taro.switchTab({ url: '/pages/index/index' })
+    }
+  }
+
   const handleAiContext = () => {
     if (!record) return
     const query: Record<string, string> = {
@@ -69,45 +77,55 @@ function CaseDetailPage() {
   }
 
   return (
-    <View className='page-case-detail'>
+    <View className='page-case-detail page-shell'>
       {loading && <StateHint status='loading' message='加载病例详情中…' />}
       {error && !loading && <StateHint status='error' message={error} />}
       {!loading && record && (
         <>
-          <View className='detail-header'>
-            <Text className='detail-header__title'>{record.identifier}</Text>
-            {record.displayName && (
-              <Text className='detail-header__subtitle'>{record.displayName}</Text>
-            )}
+          <View className='detail-top'>
+            <View className='nav-back' onClick={handleBack}>
+              <Text className='nav-back__icon'>←</Text>
+            </View>
+            <View className='detail-header'>
+              <Text className='detail-header__title'>{record.identifier}</Text>
+              {record.displayName && (
+                <Text className='detail-header__subtitle'>{record.displayName}</Text>
+              )}
+            </View>
           </View>
 
           <View className='detail-tabs'>
             <Text
+              className={`detail-tabs__item ${tab === 'preview' ? 'detail-tabs__item--active' : ''}`}
+              onClick={() => setTab('preview')}
+            >
+              预览
+            </Text>
+            <Text
               className={`detail-tabs__item ${tab === 'analysis' ? 'detail-tabs__item--active' : ''}`}
               onClick={() => setTab('analysis')}
             >
-              分析数据
-            </Text>
-            <Text
-              className={`detail-tabs__item ${tab === 'prediction' ? 'detail-tabs__item--active' : ''}`}
-              onClick={() => setTab('prediction')}
-            >
-              预测 & 建议
+              数据分析
             </Text>
           </View>
 
-          {tab === 'analysis' && highlightedSample?.analysis && (
-            <AnalysisMetrics analysis={highlightedSample.analysis} />
-          )}
-          {tab === 'analysis' && !highlightedSample?.analysis && (
-            <StateHint status='empty' message='该病例暂无分析数据' />
+          {tab === 'preview' && (
+            <>
+              {(highlightedSample || highlightedReport) && (
+                <PreviewPanel sample={highlightedSample ?? null} report={highlightedReport ?? null} />
+              )}
+              {!highlightedSample && !highlightedReport && (
+                <StateHint status='empty' message='暂无图像或文字可预览' />
+              )}
+            </>
           )}
 
-          {tab === 'prediction' && highlightedReport && (
-            <PredictionPanel report={highlightedReport} />
-          )}
-          {tab === 'prediction' && !highlightedReport && (
-            <StateHint status='empty' message='该病例暂无预测建议' />
+          {tab === 'analysis' && (
+            <AnalysisPanel
+              caseIdentifier={record.identifier}
+              sample={highlightedSample ?? null}
+              report={highlightedReport ?? null}
+            />
           )}
         </>
       )}

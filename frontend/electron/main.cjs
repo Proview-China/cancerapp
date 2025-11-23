@@ -25,6 +25,31 @@ function createWindow() {
     },
   })
 
+  // 允许 Ctrl/Cmd +/-/0 控制缩放，保持当前窗口内有效
+  let zoomFactor = 1
+  win.webContents.setVisualZoomLevelLimits(1, 3)
+  win.webContents.on('before-input-event', (event, input) => {
+    if (input.type !== 'keyDown') return
+    const useAccel = input.control || input.meta
+    if (!useAccel) return
+
+    if (input.key === '0') {
+      zoomFactor = 1
+      win.webContents.setZoomFactor(zoomFactor)
+      event.preventDefault()
+    }
+    if (input.key === '-' || input.key === '_') {
+      zoomFactor = Math.max(0.5, zoomFactor - 0.1)
+      win.webContents.setZoomFactor(zoomFactor)
+      event.preventDefault()
+    }
+    if (input.key === '=' || input.key === '+') {
+      zoomFactor = Math.min(3, zoomFactor + 0.1)
+      win.webContents.setZoomFactor(zoomFactor)
+      event.preventDefault()
+    }
+  })
+
   if (isDev) {
     win.loadURL('http://localhost:5173')
     win.webContents.openDevTools({ mode: 'detach' })
