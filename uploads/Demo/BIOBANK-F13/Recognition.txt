@@ -1,0 +1,5 @@
+阳性细胞比率(Positive Cells, %)=87.91%	
+阳性细胞密度(Positive Cells Density, number/mm²)=4222
+平均光密度值(Mean Density)=0.0875	
+H-Score=178.58	
+IRS=8

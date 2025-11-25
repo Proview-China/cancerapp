@@ -1,0 +1,10 @@
+1级弱阳性细胞数量(Positive Cells 1 Weak)=12
+2级中度阳性细胞数量(Positive Cells 2 Moderate)=7856
+3级强阳性细胞数量(Positive Cells 3 Strong)=268
+IOD=155078
+细胞总数(Total Cells Number)=9255
+阳性面积(Positive Area, mm²)=0.5357
+组织面积(Tissue Area, mm²)=1.9269
+阳性像素面积(Positive Area, pixel)=1772123
+组织像素面积(Tissue Area, pixel)=6374024
+阳性强度(Positive Intensity)=2
