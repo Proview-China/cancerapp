@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>cancerapp</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="assets/css/style.css">
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="container site-header__inner">
+        <button class="menu-toggle" type="button" aria-label="Open menu" aria-expanded="false">
+          <span></span>
+          <span></span>
+          <span></span>
+        </button>
+        <div class="site-header__center">
+          <a class="brand" href="#">
+            <img src="logo.png" alt="cancerapp" class="brand__logo" />
+          </a>
+          <nav class="primary-nav" aria-label="Primary navigation">
+            <a href="#" class="primary-nav__link" data-i18n="nav.clinical">Clinical</a>
+            <a href="#" class="primary-nav__link" data-i18n="nav.life">Life Sciences</a>
+            <a href="#" class="primary-nav__link" data-i18n="nav.evidence">Clinical Evidence</a>
+            <a href="#" class="primary-nav__link" data-i18n="nav.media">Media Center</a>
+            <a href="#" class="primary-nav__link" data-i18n="nav.about">About</a>
+          </nav>
+        </div>
+        <div class="language-toggle" role="group" aria-label="Language toggle">
+          <button class="language-toggle__btn is-active" type="button" data-lang="en">EN</button>
+          <span class="language-toggle__divider">/</span>
+          <button class="language-toggle__btn" type="button" data-lang="zh">中文</button>
+        </div>
+        <a class="primary-nav__cta" href="#" data-i18n="cta.contact">Contact Us</a>
+      </div>
+    </header>
+
+    <div class="menu-panel" aria-hidden="true">
+      <div class="menu-panel__backdrop"></div>
+      <div class="menu-panel__content">
+        <button class="menu-panel__close" type="button" aria-label="Close menu">×</button>
+        <div class="menu-panel__grid">
+          <nav class="menu-panel__nav" aria-label="Expanded navigation">
+            <a href="#" class="menu-panel__link" data-i18n="nav.clinical">Clinical</a>
+            <a href="#" class="menu-panel__link" data-i18n="nav.life">Life Sciences</a>
+            <a href="#" class="menu-panel__link" data-i18n="nav.evidence">Clinical Evidence</a>
+            <a href="#" class="menu-panel__link" data-i18n="nav.media">Media Center</a>
+            <a href="#" class="menu-panel__link" data-i18n="nav.about">About</a>
+          </nav>
+          <div class="menu-panel__cta-block">
+            <div class="language-toggle language-toggle--menu" role="group" aria-label="Language toggle">
+              <button class="language-toggle__btn is-active" type="button" data-lang="en">EN</button>
+              <span class="language-toggle__divider">/</span>
+              <button class="language-toggle__btn" type="button" data-lang="zh">中文</button>
+            </div>
+            <a class="btn btn--primary" href="#" data-i18n="cta.request">Request a trial</a>
+            <a class="menu-panel__secondary" href="#" data-i18n="cta.contact">Contact Us</a>
+            <div class="menu-panel__contact">
+              <span>info@cancerapp.ai</span>
+              <span data-i18n="contact.address">33 Irving Place<br>New York, NY 10003</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <main>
+      <section class="hero">
+        <div class="container hero__inner">
+          <h1 class="hero__title" data-i18n="hero.title">AI to solve cancer’s most critical issues</h1>
+          <p class="hero__subtitle" data-i18n="hero.subtitle">Revolutionizing pathology with next generation technology</p>
+        </div>
+      </section>
+
+      <section class="intro reveal">
+        <div class="container intro__inner">
+          <p class="intro__lead" data-i18n="intro.lead">
+            As longstanding leaders in AI, cancerapp was among the first to apply the power of foundation models to cancer care and has since delivered numerous models that set new standards for size, scale, and performance.
+          </p>
+          <hr class="intro__divider">
+          <h2 class="section-heading" data-i18n="intro.heading">What We Provide</h2>
+          <div class="card-grid card-grid--triplet">
+            <article class="feature-card feature-card--violet">
+              <img src="assets/images/diagnostics.png" alt="" class="feature-card__media">
+              <div class="feature-card__body">
+                <h3 class="feature-card__title" data-i18n="feature.diagnostic.title">Diagnostic &amp; Biomarker AI</h3>
+                <p class="feature-card__text" data-i18n="feature.diagnostic.text">
+                  Tissue-based AI-assisted applications to support cancer detection, subtyping, and molecular biomarker discovery from tissues.
+                </p>
+                <a class="feature-card__cta" href="#" data-i18n="cta.learnMore">Learn more</a>
+              </div>
+            </article>
+            <article class="feature-card feature-card--plum">
+              <img src="assets/images/omniscreen-purple.png" alt="" class="feature-card__media">
+              <div class="feature-card__body">
+                <h3 class="feature-card__title" data-i18n="feature.tech.title">AI Technology &amp; Services</h3>
+                <p class="feature-card__text" data-i18n="feature.tech.text">
+                  Foundation models and AI modules developed to accelerate research and development of novel computational pathology applications.
+                </p>
+                <a class="feature-card__cta" href="#" data-i18n="cta.learnMore">Learn more</a>
+              </div>
+            </article>
+            <article class="feature-card feature-card--teal">
+              <img src="assets/images/alba-green.png" alt="" class="feature-card__media">
+              <div class="feature-card__body">
+                <h3 class="feature-card__title" data-i18n="feature.alba.title">cancerapp Alba™</h3>
+                <p class="feature-card__text" data-i18n="feature.alba.text">
+                  cancerapp’s proprietary multi-modal co-pilot designed to revolutionize pathology workflows and unlock precision medicine.
+                </p>
+                <a class="feature-card__cta" href="#" data-i18n="cta.learnMore">Learn more</a>
+              </div>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="diagnostic-hero reveal">
+        <div class="container diagnostic-hero__inner">
+          <h2 class="diagnostic-hero__title" data-i18n="diagnostic.heading">AI-Assisted Diagnostic &amp; Biomarker AI</h2>
+        </div>
+      </section>
+
+      <section class="suite-overview reveal">
+        <div class="container suite-overview__inner">
+          <p class="suite-overview__lead" data-i18n="suite.lead">
+            cancerapp has developed powerful AI applications to support diagnostic decision making in cancer pathology. In addition, cancerapp’s novel AI technologies can reveal multiple molecular biomarkers directly from the tissue sample. Developed to assist the diagnostic workflow in pathology, cancerapp’s AI applications can alleviate time and resource pressures enabling pathologists to better balance their ever-growing workloads while still delivering informed, quality diagnoses.
+          </p>
+          <hr class="section-divider">
+          <div class="suite-grid">
+            <div class="suite-column suite-column--stacked">
+              <article class="suite-card">
+                <img src="assets/images/Prostate_1.jpg" alt="" class="suite-card__image">
+                <div class="suite-card__body">
+                  <h3 class="suite-card__title" data-i18n="suite.prostate.title">cancerapp Prostate Suite</h3>
+                  <p class="suite-card__text" data-i18n="suite.prostate.text">
+                    Comprehensive AI applications that aid in the detection and diagnosis of prostate cancer on H&amp;E-stained whole-slide images of prostate needle biopsies.
+                  </p>
+                </div>
+              </article>
+              <article class="suite-card">
+                <img src="assets/images/Breast_Lymph_Node_2.jpg" alt="" class="suite-card__image">
+                <div class="suite-card__body">
+                  <h3 class="suite-card__title" data-i18n="suite.breast.title">cancerapp Breast Suite</h3>
+                  <p class="suite-card__text" data-i18n="suite.breast.text">
+                    AI applications designed to support pathologists in the identification and classification of breast cancer on H&amp;E-stained whole-slide images from breast biopsy and excision specimens.
+                  </p>
+                </div>
+              </article>
+            </div>
+            <div class="suite-column">
+              <article class="suite-card">
+                <img src="assets/images/PanCancer.jpg" alt="" class="suite-card__image">
+                <div class="suite-card__body">
+                  <h3 class="suite-card__title" data-i18n="suite.pancancer.title">cancerapp PanCancer Suite</h3>
+                  <p class="suite-card__text" data-i18n="suite.pancancer.text">
+                    Developed using Virchow and cumulatively trained on over 1.5 million slides, cancerapp’s PanCancer Suite is able to help pathologists identify the most subtle complexities of cancer in multiple tissue types including rare cancers.
+                  </p>
+                </div>
+              </article>
+            </div>
+          </div>
+          <a class="btn btn--primary suite-overview__cta" href="#" data-i18n="cta.learnMore">Learn more</a>
+        </div>
+      </section>
+
+      <section class="technology reveal">
+        <div class="container technology__inner">
+          <div class="technology__layout">
+            <div class="technology__media">
+              <img src="assets/images/bokeh-striped-neon-lights.jpg" alt="">
+            </div>
+            <div class="technology__details">
+              <div class="technology__content">
+                <h2 class="section-heading" data-i18n="tech.heading">AI Technology &amp; Services</h2>
+                <p class="technology__lead" data-i18n="tech.lead">
+                  By licensing our advanced technology, you can develop customized AI models that adhere to the highest standards of privacy, security, and clinical excellence. Unlike traditional AI development, our versatile foundation models eliminate the need for task-specific training, saving valuable time and resources. Leverage cancerapp’s technology to streamline your AI development, optimize existing applications, and drive groundbreaking advancements in cancer.
+                </p>
+              </div>
+              <div class="technology__columns">
+                <div class="technology__column">
+                  <span class="technology__label" data-i18n="tech.label">TECHNOLOGY</span>
+                  <h3 class="technology__headline" data-i18n="tech.modules.heading">PanCancer AI Modules</h3>
+                  <p class="technology__text" data-i18n="tech.modules.text">
+                    Pre-built pan cancer modules that enable precise therapeutic targeting, novel biomarker identification, and optimized clinical trial design.
+                  </p>
+                  <h3 class="technology__headline" data-i18n="tech.foundation.heading">Foundation Models</h3>
+                  <ul class="technology__list">
+                    <li>Virchow</li>
+                    <li>Virchow2</li>
+                    <li>Virchow2G</li>
+                    <li>Virchow2G-Mini</li>
+                    <li>PRISM</li>
+                  </ul>
+                </div>
+                <div class="technology__column">
+                  <span class="technology__label" data-i18n="tech.services.label">SERVICES</span>
+                  <p class="technology__text" data-i18n="tech.services.text">
+                    We offer comprehensive services ranging from AI and industry-specific expertise, custom AI development including development of prognostic or predictive applications, regulatory strategy, and commercialization services.
+                  </p>
+                </div>
+              </div>
+              <a class="btn btn--secondary technology__cta" href="#" data-i18n="cta.learnMore">Learn more</a>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="alba reveal">
+        <div class="container alba__inner">
+          <div class="alba__content">
+            <h2 class="section-heading" data-i18n="alba.heading">cancerapp Alba™</h2>
+            <p class="alba__text" data-i18n="alba.text">
+              Alba™ is a revolutionary co-pilot designed to transform how pathologists work with technology. By integrating cutting-edge AI with intuitive voice and text commands, Alba streamlines cancer detection and diagnosis workflows and improves efficiency.
+            </p>
+            <hr class="section-divider section-divider--centered">
+            <a class="btn btn--outline alba__cta" href="#" data-i18n="cta.learnMore">Learn more</a>
+          </div>
+        </div>
+      </section>
+
+      <!-- Showcase Gallery -->
+      <section class="showcase reveal" aria-label="Product Screenshots">
+        <div class="container showcase__inner">
+          <h2 class="section-heading" data-i18n="showcase.heading">In-Product Screens</h2>
+          <div class="showcase__columns">
+            <div class="showcase__column showcase__column--primary">
+              <figure class="showcase__item">
+                <img src="favor/Home Page of AI-Driven Case &amp; Medical Analysis Software.png" alt="Home – AI-driven case &amp; medical analysis" loading="lazy">
+                <figcaption data-i18n="showcase.home">Home – AI-driven case &amp; medical analysis</figcaption>
+              </figure>
+              <figure class="showcase__item">
+                <img src="favor/Comprehensive Medical Pathology Image Display.png" alt="Comprehensive pathology image display" loading="lazy">
+                <figcaption data-i18n="showcase.pathology">Comprehensive pathology image display</figcaption>
+              </figure>
+              <figure class="showcase__item">
+                <img src="favor/Intelligent Analysis Chart.png" alt="Intelligent analysis charts" loading="lazy">
+                <figcaption data-i18n="showcase.charts">Intelligent analysis charts</figcaption>
+              </figure>
+            </div>
+            <div class="showcase__column showcase__column--stacked">
+              <figure class="showcase__item">
+                <img src="favor/Multifunctional Case Management and Viewing.png" alt="Case management &amp; viewer" loading="lazy">
+                <figcaption data-i18n="showcase.case">Case management &amp; viewer</figcaption>
+              </figure>
+              <figure class="showcase__item">
+                <img src="favor/AI Intelligent Analysis Dialogue Panel.png" alt="AI analysis dialogue" loading="lazy">
+                <figcaption data-i18n="showcase.dialogue">AI analysis dialogue</figcaption>
+              </figure>
+              <figure class="showcase__item">
+                <img src="favor/AI pathology insights dashboard.png" alt="AI pathology insights dashboard" loading="lazy">
+                <figcaption data-i18n="showcase.dashboard">AI pathology insights dashboard</figcaption>
+              </figure>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="news reveal">
+        <div class="container news__inner">
+          <div class="news__content">
+            <span class="news__eyebrow" data-i18n="news.eyebrow">Latest News</span>
+            <h2 class="news__title" data-i18n="news.title">Highlighting innovation in action</h2>
+            <p class="news__description" data-i18n="news.description">
+              cancerapp is in the news. See what we have been up to.
+            </p>
+            <a class="news__cta" href="#" data-i18n="news.cta">Read more</a>
+          </div>
+        </div>
+      </section>
+
+      <section class="contact reveal">
+        <div class="container contact__inner">
+          <div class="contact__media">
+            <img src="assets/images/shutterstock_2140344467.jpg" alt="" class="contact__image">
+          </div>
+          <div class="contact__content">
+            <h2 class="section-heading" data-i18n="contact.heading">Contact Us to Learn More</h2>
+            <p class="contact__text" data-i18n="contact.text">
+              Connect with the cancerapp team to explore how our advanced pathology AI can transform your organization.
+            </p>
+            <a class="btn btn--primary contact__cta" href="#" data-i18n="cta.contact">Contact us</a>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="container site-footer__inner">
+        <div class="site-footer__column">
+          <h3 class="site-footer__heading" data-i18n="footer.about">About cancerapp</h3>
+          <ul class="site-footer__links">
+            <li><a href="#" data-i18n="footer.request">Request a Trial</a></li>
+            <li><a href="#" data-i18n="footer.diagnostic">Diagnostic AI</a></li>
+            <li><a href="#" data-i18n="feature.alba.title">cancerapp Alba™</a></li>
+            <li><a href="#" data-i18n="footer.tech">AI Tech &amp; Services</a></li>
+            <li><a href="#" data-i18n="footer.publications">Publications</a></li>
+          </ul>
+        </div>
+        <div class="site-footer__column">
+          <h3 class="site-footer__heading" data-i18n="footer.contactHeading">Get in Touch</h3>
+          <ul class="site-footer__links">
+            <li><a href="mailto:info@cancerapp.ai">info@cancerapp.ai</a></li>
+            <li><span data-i18n="contact.address">33 Irving Place<br>New York, NY 10003</span></li>
+          </ul>
+        </div>
+      </div>
+      <div class="site-footer__bottom">
+        <div class="container site-footer__bottom-inner">
+          <span data-i18n="footer.copyright">© <span data-current-year>2025</span> cancerapp Inc. All rights reserved.</span>
+          <div class="site-footer__legal">
+            <a href="#" data-i18n="footer.terms">Terms &amp; Conditions</a>
+            <a href="#" data-i18n="footer.privacy">Privacy Policy</a>
+          </div>
+          <div class="site-footer__social">
+            <a href="#" aria-label="LinkedIn">in</a>
+          </div>
+          <div class="site-footer__disclaimer" data-i18n="footer.disclaimer">All trademarks are property of their respective owners.</div>
+        </div>
+      </div>
+    </footer>
+
+    <script src="assets/js/main.js" defer></script>
+  </body>
+</html>
