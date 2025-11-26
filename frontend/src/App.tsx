@@ -4,6 +4,7 @@ import { AnalysisSidebar } from './components/AnalysisSidebar'
 import { PreferencesSidebar } from './components/PreferencesSidebar'
 import { PreferencesContent, type PreferencePage } from './components/PreferencesContent'
 import { CasesWorkspace } from './components/CasesWorkspace'
+import { TasksWorkspace } from './components/TasksWorkspace'
 import type { CaseCreateSample, CaseRecord, CaseReportDraft, Modality } from './types/cases'
 import {
   fetchCases,
@@ -32,7 +33,7 @@ const MENU_ITEMS: Array<{ label: string; key: PageKey }> = [
 const SIDEBAR_ENABLED: Record<PageKey, boolean> = {
   analysis: true,
   data: true,
-  tasks: true,
+  tasks: false,
   preferences: true,
 }
 
@@ -469,7 +470,15 @@ function App() {
                         />
                       </>
                     ) : null}
-                    <div className={['canvas-page__main', item.key === 'preferences' ? 'preferences-layout' : ''].join(' ').trim()}>
+                    <div
+                      className={[
+                        'canvas-page__main',
+                        item.key === 'preferences' ? 'preferences-layout' : '',
+                        item.key === 'tasks' ? 'tasks-layout' : '',
+                      ]
+                        .join(' ')
+                        .trim()}
+                    >
                       {item.key === 'preferences' ? (
                         <PreferencesContent activePage={preferencesPage} onPageChange={setPreferencesPage} />
                       ) : item.key === 'analysis' ? (
@@ -491,7 +500,7 @@ function App() {
                           rightMode="ai"
                         />
                       ) : item.key === 'tasks' ? (
-                        <span className="canvas-page__title">任务</span>
+                        <TasksWorkspace />
                       ) : null}
                     </div>
                   </div>
