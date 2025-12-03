@@ -37,6 +37,7 @@ CREATE TABLE IF NOT EXISTS case_samples (
     storage_path        TEXT NOT NULL,
     storage_thumbnail   TEXT,
     checksum            TEXT,
+    sort_order          INTEGER,
     created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -53,6 +54,7 @@ CREATE TABLE IF NOT EXISTS case_reports (
     content         TEXT NOT NULL,
     tags            TEXT[] DEFAULT '{}',
     metadata        JSONB DEFAULT '{}',
+    sort_order      INTEGER,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );

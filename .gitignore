@@ -13,6 +13,7 @@ frontend/dist-ssr
 # Backend/build artifacts
 backend/node_modules
 backend/dist
+backend/ai-config.json
 wechatapp/node_modules
 wechatapp/dist
 *.zip

@@ -520,13 +520,14 @@
 
 .stats-bar {
   width: 100%;
-  height: 36px;
+  min-height: 36px;
   border-radius: 14px;
   background: var(--panel-gradient);
-  padding: 0 28px;
-  display: flex;
+  padding: 6px 20px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
   align-items: center;
-  justify-content: center;
   box-shadow:
     0 14px 28px var(--shadow-outer),
     inset 0 1px 0 rgba(255, 255, 255, 0.78),
@@ -557,6 +558,40 @@
   transform: translateY(-22px) scale(0.96, 1.12);
   z-index: -1;
   pointer-events: none;
+}
+
+.stats-bar__segment {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.stats-bar__segment--center {
+  text-align: center;
+}
+
+.stats-bar__segment--right {
+  text-align: right;
+}
+
+.stats-bar__label {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  letter-spacing: 0.04em;
+}
+
+.stats-bar__value {
+  margin: 0;
+  font-size: 0.88rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.32);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .is-resizing {

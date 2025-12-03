@@ -1,7 +1,9 @@
+import { useEffect, useState } from 'react'
 import { GuidedScrollArea } from './GuidedScrollArea'
 import { PondSwitch } from './PondSwitch'
 import { VolcanoSelect } from './VolcanoSelect'
 import './PreferencesContent.css'
+import { fetchAIConfig, saveAIConfig, type AIConfig } from '../services/aiService'
 
 type PreferencePage = 'appearance' | 'notification' | 'data' | 'performance'
 
@@ -180,14 +182,7 @@ const PerformanceSettings = () => {
       </div>
 
       {/* 后台行为 - 火山口 */}
-      <div className="preferences-volcano">
-        <h3 className="preferences-volcano__title">后台行为</h3>
-        <div className="preferences-volcano__stack">
-          <PondSwitch label="最小化时降低性能" />
-          <PondSwitch label="允许后台推理任务" defaultChecked />
-          <PondSwitch label="空闲时自动暂停" />
-        </div>
-      </div>
+      <BackstageSettings />
 
       {/* 日志行为 - 火山口 */}
       <div className="preferences-volcano">
@@ -202,3 +197,73 @@ const PerformanceSettings = () => {
 }
 
 export type { PreferencePage }
+
+const BackstageSettings = () => {
+  const [baseUrl, setBaseUrl] = useState('')
+  const [apiKey, setApiKey] = useState('')
+  const [model, setModel] = useState('')
+  const [status, setStatus] = useState<{ hasKey: boolean; message: string | null; loading: boolean }>({
+    hasKey: false,
+    message: null,
+    loading: true,
+  })
+
+  useEffect(() => {
+    fetchAIConfig()
+      .then((cfg: AIConfig) => {
+        setBaseUrl(cfg.baseUrl)
+        setModel(cfg.model)
+        setStatus({ hasKey: cfg.hasApiKey, message: null, loading: false })
+      })
+      .catch(() => setStatus({ hasKey: false, message: '无法获取 AI 配置', loading: false }))
+  }, [])
+
+  const handleSave = async () => {
+    setStatus((prev) => ({ ...prev, message: null, loading: true }))
+    try {
+      const saved = await saveAIConfig({ baseUrl, apiKey, model })
+      setStatus({ hasKey: saved.hasApiKey, message: '已保存', loading: false })
+      setApiKey('') // 保存后清空，避免明文滞留
+    } catch (error) {
+      setStatus({
+        hasKey: false,
+        message: error instanceof Error ? error.message : '保存失败',
+        loading: false,
+      })
+    }
+  }
+
+  return (
+    <div className="preferences-volcano">
+      <h3 className="preferences-volcano__title">后台行为 · AI 提供方</h3>
+      <div className="preferences-volcano__stack">
+        <label className="pond-label">API Base URL</label>
+        <input
+          className="pond-input"
+          placeholder="https://api.deepseek.com/v1"
+          value={baseUrl}
+          onChange={(e) => setBaseUrl(e.target.value)}
+        />
+        <label className="pond-label">API Key（保存后不回显）</label>
+        <input
+          className="pond-input"
+          placeholder="sk-..."
+          type="password"
+          value={apiKey}
+          onChange={(e) => setApiKey(e.target.value)}
+        />
+        <label className="pond-label">模型</label>
+        <input
+          className="pond-input"
+          placeholder="deepseek-chat"
+          value={model}
+          onChange={(e) => setModel(e.target.value)}
+        />
+        <button type="button" className="pond-button" onClick={handleSave} disabled={status.loading}>
+          {status.loading ? '保存中…' : '保存配置'}
+        </button>
+        <div className="preferences-hint">{status.message ?? (status.hasKey ? 'Key 已配置' : '尚未配置 Key')}</div>
+      </div>
+    </div>
+  )
+}

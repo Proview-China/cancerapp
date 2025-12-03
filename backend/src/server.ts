@@ -2,6 +2,7 @@ import express from 'express'
 import cors from 'cors'
 import { config } from './config.js'
 import { casesRouter } from './routes/cases.js'
+import { aiRouter } from './routes/ai.js'
 
 const app = express()
 
@@ -11,6 +12,7 @@ app.use(express.json())
 app.use('/uploads', express.static(config.uploadsRoot))
 
 app.use('/cases', casesRouter)
+app.use('/ai', aiRouter)
 
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok' })

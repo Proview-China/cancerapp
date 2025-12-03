@@ -1,9 +1,11 @@
 import { pool } from './pool.js'
 
+const isTestEnv = process.env.NODE_ENV === 'test'
+
 let initialized = false
 
 export const ensureCaseReportsTable = async () => {
-  if (initialized) {
+  if (initialized || isTestEnv) {
     return
   }
 
@@ -16,6 +18,7 @@ export const ensureCaseReportsTable = async () => {
       content TEXT NOT NULL,
       tags TEXT[] DEFAULT '{}',
       metadata JSONB DEFAULT '{}',
+      sort_order INTEGER,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
@@ -44,9 +47,74 @@ export const ensureCaseReportsTable = async () => {
   initialized = true
 }
 
+let ensuredCaseSamplesSortOrder = false
+
+export const ensureCaseSamplesSortOrder = async () => {
+  if (ensuredCaseSamplesSortOrder) {
+    return
+  }
+
+  await pool.query('ALTER TABLE case_samples ADD COLUMN IF NOT EXISTS sort_order INTEGER')
+
+  const result = await pool.query<{ id: string; case_id: string; created_at: Date }>(
+    'SELECT id, case_id, created_at FROM case_samples WHERE sort_order IS NULL ORDER BY case_id, created_at DESC',
+  )
+
+  const groups = new Map<string, string[]>()
+  for (const row of result.rows) {
+    const list = groups.get(row.case_id) ?? []
+    list.push(row.id)
+    groups.set(row.case_id, list)
+  }
+
+  for (const [caseId, ids] of groups) {
+    let order = 0
+    for (const id of ids) {
+      order += 1
+      // eslint-disable-next-line no-await-in-loop
+      await pool.query('UPDATE case_samples SET sort_order = $1 WHERE id = $2 AND case_id = $3', [order, id, caseId])
+    }
+  }
+
+  ensuredCaseSamplesSortOrder = true
+}
+
+let ensuredCaseReportsSortOrder = false
+
+export const ensureCaseReportsSortOrder = async () => {
+  if (ensuredCaseReportsSortOrder) {
+    return
+  }
+
+  await pool.query('ALTER TABLE case_reports ADD COLUMN IF NOT EXISTS sort_order INTEGER')
+
+  const result = await pool.query<{ id: string; case_id: string; created_at: Date }>(
+    'SELECT id, case_id, created_at FROM case_reports WHERE sort_order IS NULL ORDER BY case_id, created_at DESC',
+  )
+
+  const groups = new Map<string, string[]>()
+  for (const row of result.rows) {
+    const list = groups.get(row.case_id) ?? []
+    list.push(row.id)
+    groups.set(row.case_id, list)
+  }
+
+  for (const [caseId, ids] of groups) {
+    let order = 0
+    for (const id of ids) {
+      order += 1
+      // eslint-disable-next-line no-await-in-loop
+      await pool.query('UPDATE case_reports SET sort_order = $1 WHERE id = $2 AND case_id = $3', [order, id, caseId])
+    }
+  }
+
+  ensuredCaseReportsSortOrder = true
+}
+
 let ensuredTissueAnalysis = false
 
 export const ensureSampleTissueAnalysisTable = async () => {
+  if (isTestEnv) return
   if (ensuredTissueAnalysis) return
 
   const sql = `

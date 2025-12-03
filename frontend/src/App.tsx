@@ -15,24 +15,24 @@ import {
   deleteCaseReport,
   updateCase,
   updateCaseSample,
+  reorderCaseReports,
+  reorderCaseSamples,
 } from './services/caseService'
 
 const MIN_SIDEBAR_WIDTH = 420
 const MAX_SIDEBAR_WIDTH = 720
 
-type PageKey = 'analysis' | 'data' | 'tasks' | 'preferences'
+type PageKey = 'analysis' | 'data' | 'preferences'
 
 const MENU_ITEMS: Array<{ label: string; key: PageKey }> = [
   { label: '病例', key: 'analysis' },
   { label: '分析', key: 'data' },
-  { label: '任务', key: 'tasks' },
   { label: '设置', key: 'preferences' },
 ]
 
 const SIDEBAR_ENABLED: Record<PageKey, boolean> = {
   analysis: true,
   data: true,
-  tasks: true,
   preferences: true,
 }
 
@@ -40,7 +40,6 @@ function App() {
   const [sidebarWidths, setSidebarWidths] = useState<Record<PageKey, number>>({
     analysis: MIN_SIDEBAR_WIDTH,
     data: MIN_SIDEBAR_WIDTH,
-    tasks: MIN_SIDEBAR_WIDTH,
     preferences: MIN_SIDEBAR_WIDTH,
   })
   const [resizingKey, setResizingKey] = useState<PageKey | null>(null)
@@ -51,6 +50,9 @@ function App() {
   const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null)
   const [selectedSampleId, setSelectedSampleId] = useState<string | null>(null)
   const [selectedReportId, setSelectedReportId] = useState<string | null>(null)
+  const selectedCase = cases.find((item) => item.id === selectedCaseId) ?? null
+  const selectedSample = selectedCase?.samples.find((item) => item.id === selectedSampleId) ?? null
+  const selectedReport = selectedCase?.reports.find((item) => item.id === selectedReportId) ?? null
   const resizeOrigin = useRef<{ startX: number; startWidth: number; pageKey: PageKey | null }>({
     startX: 0,
     startWidth: 0,
@@ -313,6 +315,52 @@ function App() {
     [],
   )
 
+  const handleReorderSamples = useCallback(async (caseId: string, sampleIds: string[]) => {
+    let previous: CaseRecord[] = []
+    setCases((prev) => {
+      previous = prev
+      return prev.map((item) => {
+        if (item.id !== caseId) return item
+        const map = new Map(item.samples.map((sample) => [sample.id, sample]))
+        const nextSamples = sampleIds
+          .map((id) => map.get(id))
+          .filter((sample): sample is CaseRecord['samples'][number] => Boolean(sample))
+        return { ...item, samples: nextSamples }
+      })
+    })
+
+    try {
+      await reorderCaseSamples(caseId, sampleIds)
+    } catch (error) {
+      console.error('保存样本排序失败', error)
+      setCases(previous)
+      throw error instanceof Error ? error : new Error('保存样本排序失败')
+    }
+  }, [])
+
+  const handleReorderReports = useCallback(async (caseId: string, reportIds: string[]) => {
+    let previous: CaseRecord[] = []
+    setCases((prev) => {
+      previous = prev
+      return prev.map((item) => {
+        if (item.id !== caseId) return item
+        const map = new Map(item.reports.map((report) => [report.id, report]))
+        const nextReports = reportIds
+          .map((id) => map.get(id))
+          .filter((report): report is CaseRecord['reports'][number] => Boolean(report))
+        return { ...item, reports: nextReports }
+      })
+    })
+
+    try {
+      await reorderCaseReports(caseId, reportIds)
+    } catch (error) {
+      console.error('保存文字病历排序失败', error)
+      setCases(previous)
+      throw error instanceof Error ? error : new Error('保存文字病历排序失败')
+    }
+  }, [])
+
   const handleDeleteReport = useCallback(async (caseId: string, reportId: string) => {
     await deleteCaseReport(caseId, reportId)
     setCases((prev) => {
@@ -365,6 +413,31 @@ function App() {
     },
     [],
   )
+
+  const renderCurrentContext = () => {
+    if (!selectedCase) {
+      return '当前未选择病例'
+    }
+    const caseLabel = selectedCase.displayName || selectedCase.identifier
+    if (selectedReport) {
+      return `${caseLabel} · 文字 · ${selectedReport.title}`
+    }
+    if (selectedSample) {
+      return `${caseLabel} · 图像 · ${selectedSample.displayName || selectedSample.originalFilename}`
+    }
+    return `${caseLabel} · 未选中具体内容`
+  }
+
+  const renderNowActivity = () => {
+    if (importingCase) {
+      return '正在导入病例…'
+    }
+    return '当前无进行中的操作'
+  }
+
+  const renderBackgroundTasks = () => {
+    return '后台任务空闲'
+  }
 
   const activeIndex = MENU_ITEMS.findIndex((item) => item.key === activePage)
 
@@ -422,7 +495,7 @@ function App() {
               const isActive = item.key === activePage
               const sidebarWidth = hasSidebar ? sidebarWidths[item.key] ?? MIN_SIDEBAR_WIDTH : undefined
               const isResizingCurrent = resizingKey === item.key
-              const shouldUseAnalysisSidebar = ['analysis', 'data', 'tasks'].includes(item.key)
+              const shouldUseAnalysisSidebar = ['analysis', 'data'].includes(item.key)
               return (
                 <section key={item.key} className="canvas-page" aria-label={item.label}>
                   <div
@@ -436,23 +509,25 @@ function App() {
                     {hasSidebar ? (
                       <>
                         {shouldUseAnalysisSidebar ? (
-                          <AnalysisSidebar
-                            cases={cases}
-                            selectedCaseId={selectedCaseId}
-                            selectedSampleId={selectedSampleId}
-                            selectedReportId={selectedReportId}
+            <AnalysisSidebar
+              cases={cases}
+              selectedCaseId={selectedCaseId}
+              selectedSampleId={selectedSampleId}
+              selectedReportId={selectedReportId}
                             onSelectCase={handleSelectCase}
                             onSelectSample={handleSelectSample}
                             onSelectReport={handleSelectReport}
                             onImportCase={handleImportCase}
                             onDeleteCase={handleDeleteCase}
-                            onDeleteSample={handleDeleteSample}
-                            onUpdateSample={handleUpdateSample}
-                            onDeleteReport={handleDeleteReport}
-                            onRenameCase={handleRenameCase}
-                            onCreateReport={handleCreateReport}
-                            onUpdateReport={handleUpdateReport}
-                            isImporting={importingCase}
+              onDeleteSample={handleDeleteSample}
+              onUpdateSample={handleUpdateSample}
+              onDeleteReport={handleDeleteReport}
+              onRenameCase={handleRenameCase}
+              onCreateReport={handleCreateReport}
+              onUpdateReport={handleUpdateReport}
+               onReorderSamples={handleReorderSamples}
+               onReorderReports={handleReorderReports}
+              isImporting={importingCase}
                           />
                         ) : null}
                         {item.key === 'preferences' && (
@@ -490,8 +565,6 @@ function App() {
                           onUpdateReport={handleUpdateReport}
                           rightMode="ai"
                         />
-                      ) : item.key === 'tasks' ? (
-                        <span className="canvas-page__title">任务</span>
                       ) : null}
                     </div>
                   </div>
@@ -502,7 +575,17 @@ function App() {
         </main>
       </div>
 
-      <section className="stats-bar" aria-hidden />
+      <section className="stats-bar" aria-hidden>
+        <div className="stats-bar__segment">
+          <p className="stats-bar__value">{renderCurrentContext()}</p>
+        </div>
+        <div className="stats-bar__segment stats-bar__segment--center">
+          <p className="stats-bar__value">{renderNowActivity()}</p>
+        </div>
+        <div className="stats-bar__segment stats-bar__segment--right">
+          <p className="stats-bar__value">{renderBackgroundTasks()}</p>
+        </div>
+      </section>
     </div>
   )
 }

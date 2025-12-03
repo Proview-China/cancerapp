@@ -6,8 +6,17 @@
   gap: 12px;
 }
 
+.ai-chat__config-hint {
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(255, 227, 204, 0.55);
+  color: #8a4b2f;
+  font-size: 0.9rem;
+}
+
 .ai-chat__messages {
   flex: 1;
+  min-height: 0; /* 关键：允许 flex 子项缩小以触发滚动 */
   overflow: auto;
   padding: 14px 10px;
   display: flex;
@@ -21,7 +30,7 @@
   border-radius: 16px;
   line-height: 1.6;
   word-break: break-word;
-  overflow: hidden; /* 内容严格限制在气泡内 */
+  /* overflow: hidden;  <-- Removed to prevent clipping content */
   background: var(--panel-gradient);
   color: var(--text-primary);
   box-shadow:
@@ -48,8 +57,8 @@
 }
 
 .ai-chat__composer {
-  position: sticky; /* 还原钉底行为 */
-  bottom: 0;
+  /* position: sticky; 移除 sticky，flex 布局下自然在底部 */
+  /* bottom: 0; */
   display: block;
   z-index: 1;
 }

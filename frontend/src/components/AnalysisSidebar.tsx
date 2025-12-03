@@ -53,6 +53,8 @@ type AnalysisSidebarProps = {
   onRenameCase: (caseId: string, displayName: string) => Promise<void>
   onCreateReport: (caseId: string, payload: CaseReportDraft) => Promise<void>
   onUpdateReport: (caseId: string, reportId: string, payload: CaseReportDraft) => Promise<void>
+  onReorderSamples: (caseId: string, sampleIds: string[]) => Promise<void>
+  onReorderReports: (caseId: string, reportIds: string[]) => Promise<void>
   isImporting?: boolean
 }
 
@@ -116,6 +118,8 @@ export const AnalysisSidebar = ({
   onRenameCase,
   onCreateReport,
   onUpdateReport,
+  onReorderSamples,
+  onReorderReports,
   isImporting = false,
 }: AnalysisSidebarProps) => {
   const [showImportModal, setShowImportModal] = useState(false)
@@ -155,6 +159,26 @@ export const AnalysisSidebar = ({
   >(null)
   const [sampleEditorError, setSampleEditorError] = useState<string | null>(null)
   const [isSampleSaving, setIsSampleSaving] = useState(false)
+  const [reorderError, setReorderError] = useState<string | null>(null)
+
+  const [sampleOrderOverrides, setSampleOrderOverrides] = useState<Record<string, string[]>>({})
+  const [reportOrderOverrides, setReportOrderOverrides] = useState<Record<string, string[]>>({})
+
+  const sampleDragState = useRef<{
+    caseId: string
+    draggingId: string
+    originalOrder: string[]
+    currentOrder: string[]
+  } | null>(null)
+  const [sampleDraggingId, setSampleDraggingId] = useState<string | null>(null)
+
+  const reportDragState = useRef<{
+    caseId: string
+    draggingId: string
+    originalOrder: string[]
+    currentOrder: string[]
+  } | null>(null)
+  const [reportDraggingId, setReportDraggingId] = useState<string | null>(null)
 
   const caseCountBadge = useMemo(() => cases.reduce((acc, item) => acc + item.samples.length, 0), [cases])
 
@@ -806,6 +830,186 @@ export const AnalysisSidebar = ({
     }
   }, [closeSampleEditor, onUpdateSample, sampleEditor])
 
+  const getOrderedSamplesForCase = useCallback(
+    (caseItem: CaseRecord) => {
+      const override = sampleOrderOverrides[caseItem.id]
+      if (!override) {
+        return caseItem.samples
+      }
+      const map = new Map(caseItem.samples.map((sample) => [sample.id, sample]))
+      return override
+        .map((id) => map.get(id))
+        .filter((sample): sample is CaseRecord['samples'][number] => Boolean(sample))
+    },
+    [sampleOrderOverrides],
+  )
+
+  const getOrderedReportsForCase = useCallback(
+    (caseItem: CaseRecord) => {
+      const override = reportOrderOverrides[caseItem.id]
+      if (!override) {
+        return caseItem.reports
+      }
+      const map = new Map(caseItem.reports.map((report) => [report.id, report]))
+      return override
+        .map((id) => map.get(id))
+        .filter((report): report is CaseRecord['reports'][number] => Boolean(report))
+    },
+    [reportOrderOverrides],
+  )
+
+  const handleSampleDragStart = useCallback(
+    (caseItem: CaseRecord, sampleId: string, event: React.DragEvent<HTMLDivElement>) => {
+      if (event.dataTransfer) {
+        event.dataTransfer.effectAllowed = 'move'
+        event.dataTransfer.setData('text/plain', sampleId)
+      }
+      const ids = caseItem.samples.map((sample) => sample.id)
+      sampleDragState.current = {
+        caseId: caseItem.id,
+        draggingId: sampleId,
+        originalOrder: ids,
+        currentOrder: ids,
+      }
+      setSampleOrderOverrides((prev) => ({
+        ...prev,
+        [caseItem.id]: ids,
+      }))
+      setReorderError(null)
+      setSampleDraggingId(sampleId)
+    },
+    [],
+  )
+
+  const handleSampleDragOver = useCallback(
+    (caseId: string, overId: string, event: React.DragEvent<HTMLDivElement>) => {
+      if (!sampleDragState.current || sampleDragState.current.caseId !== caseId) {
+        return
+      }
+      event.preventDefault()
+
+      const state = sampleDragState.current
+      if (state.draggingId === overId) {
+        return
+      }
+      const fromIndex = state.currentOrder.indexOf(state.draggingId)
+      const toIndex = state.currentOrder.indexOf(overId)
+      if (fromIndex === -1 || toIndex === -1) {
+        return
+      }
+      const nextOrder = [...state.currentOrder]
+      nextOrder.splice(fromIndex, 1)
+      nextOrder.splice(toIndex, 0, state.draggingId)
+      sampleDragState.current = { ...state, currentOrder: nextOrder }
+      setSampleOrderOverrides((prev) => ({
+        ...prev,
+        [caseId]: nextOrder,
+      }))
+    },
+    [],
+  )
+
+  const handleSampleDragEnd = useCallback(async () => {
+    const state = sampleDragState.current
+    if (!state) {
+      return
+    }
+    sampleDragState.current = null
+    setSampleDraggingId(null)
+    setSampleOrderOverrides((prev) => {
+      const next = { ...prev }
+      delete next[state.caseId]
+      return next
+    })
+
+    const { caseId, originalOrder, currentOrder } = state
+    if (originalOrder.join(',') === currentOrder.join(',')) {
+      return
+    }
+    try {
+      await onReorderSamples(caseId, currentOrder)
+    } catch (error) {
+      console.error('保存样本排序失败', error)
+      setReorderError(error instanceof Error ? error.message : '样本排序保存失败，请稍后重试')
+    }
+  }, [onReorderSamples])
+
+  const handleReportDragStart = useCallback(
+    (caseItem: CaseRecord, reportId: string, event: React.DragEvent<HTMLDivElement>) => {
+      if (event.dataTransfer) {
+        event.dataTransfer.effectAllowed = 'move'
+        event.dataTransfer.setData('text/plain', reportId)
+      }
+      const ids = caseItem.reports.map((report) => report.id)
+      reportDragState.current = {
+        caseId: caseItem.id,
+        draggingId: reportId,
+        originalOrder: ids,
+        currentOrder: ids,
+      }
+      setReportOrderOverrides((prev) => ({
+        ...prev,
+        [caseItem.id]: ids,
+      }))
+      setReorderError(null)
+      setReportDraggingId(reportId)
+    },
+    [],
+  )
+
+  const handleReportDragOver = useCallback(
+    (caseId: string, overId: string, event: React.DragEvent<HTMLDivElement>) => {
+      if (!reportDragState.current || reportDragState.current.caseId !== caseId) {
+        return
+      }
+      event.preventDefault()
+
+      const state = reportDragState.current
+      if (state.draggingId === overId) {
+        return
+      }
+      const fromIndex = state.currentOrder.indexOf(state.draggingId)
+      const toIndex = state.currentOrder.indexOf(overId)
+      if (fromIndex === -1 || toIndex === -1) {
+        return
+      }
+      const nextOrder = [...state.currentOrder]
+      nextOrder.splice(fromIndex, 1)
+      nextOrder.splice(toIndex, 0, state.draggingId)
+      reportDragState.current = { ...state, currentOrder: nextOrder }
+      setReportOrderOverrides((prev) => ({
+        ...prev,
+        [caseId]: nextOrder,
+      }))
+    },
+    [],
+  )
+
+  const handleReportDragEnd = useCallback(async () => {
+    const state = reportDragState.current
+    if (!state) {
+      return
+    }
+    reportDragState.current = null
+    setReportDraggingId(null)
+    setReportOrderOverrides((prev) => {
+      const next = { ...prev }
+      delete next[state.caseId]
+      return next
+    })
+
+    const { caseId, originalOrder, currentOrder } = state
+    if (originalOrder.join(',') === currentOrder.join(',')) {
+      return
+    }
+    try {
+      await onReorderReports(caseId, currentOrder)
+    } catch (error) {
+      console.error('保存文字病历排序失败', error)
+      setReorderError(error instanceof Error ? error.message : '文字病历排序保存失败，请稍后重试')
+    }
+  }, [onReorderReports])
+
   const renderImagePanel = (caseItem: CaseRecord, expanded: boolean) => (
     <section
       className={[
@@ -849,14 +1053,22 @@ export const AnalysisSidebar = ({
           {caseItem.samples.length === 0 ? (
             <p className="case-panel__empty">暂无图像内容</p>
           ) : (
-            caseItem.samples.map((sample) => {
+            getOrderedSamplesForCase(caseItem).map((sample) => {
               const isSampleActive = caseItem.id === selectedCaseId && selectedSampleId === sample.id
               return (
                 <div
                   key={sample.id}
-                  className={['case-panel__media-item', isSampleActive ? 'is-active' : '']
+                  className={[
+                    'case-panel__media-item',
+                    isSampleActive ? 'is-active' : '',
+                    sampleDraggingId === sample.id ? 'is-dragging' : '',
+                  ]
                     .join(' ')
                     .trim()}
+                  draggable
+                  onDragStart={(event) => handleSampleDragStart(caseItem, sample.id, event)}
+                  onDragOver={(event) => handleSampleDragOver(caseItem.id, sample.id, event)}
+                  onDragEnd={handleSampleDragEnd}
                 >
                   <button
                     type="button"
@@ -949,10 +1161,23 @@ export const AnalysisSidebar = ({
           {caseItem.reports.length === 0 ? (
             <p className="case-panel__empty">暂无文字记录</p>
           ) : (
-            caseItem.reports.map((report) => {
+            getOrderedReportsForCase(caseItem).map((report) => {
               const isActive = caseItem.id === selectedCaseId && selectedReportId === report.id
               return (
-                <div key={report.id} className={['report-item', isActive ? 'is-active' : ''].join(' ').trim()}>
+                <div
+                  key={report.id}
+                  className={[
+                    'report-item',
+                    isActive ? 'is-active' : '',
+                    reportDraggingId === report.id ? 'is-dragging' : '',
+                  ]
+                    .join(' ')
+                    .trim()}
+                  draggable
+                  onDragStart={(event) => handleReportDragStart(caseItem, report.id, event)}
+                  onDragOver={(event) => handleReportDragOver(caseItem.id, report.id, event)}
+                  onDragEnd={handleReportDragEnd}
+                >
                   <button
                     type="button"
                     className="report-item__main"
@@ -1356,6 +1581,7 @@ export const AnalysisSidebar = ({
         </div>
 
         <GuidedScrollArea className="analysis-scrollable">
+          {reorderError ? <p className="analysis-sidebar__hint analysis-sidebar__hint--error">{reorderError}</p> : null}
           <div className="case-list">
             {cases.length === 0 ? (
               <p className="case-list__empty">尚未导入病例</p>
@@ -1383,10 +1609,10 @@ export const AnalysisSidebar = ({
                         }}
                       >
                         <div className="case-card__title-row">
-                          <span className="case-card__name">{caseItem.identifier}</span>
+                          <span className="case-card__name">{caseItem.displayName || caseItem.identifier}</span>
                         </div>
                         {caseItem.displayName ? (
-                          <div className="case-card__meta case-card__meta--alias">{caseItem.displayName}</div>
+                          <div className="case-card__meta case-card__meta--alias">{caseItem.identifier}</div>
                         ) : null}
                       </button>
                       <div className="case-card__actions-row case-card__actions-row--primary">

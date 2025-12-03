@@ -169,6 +169,10 @@ const jsonRequest = async <T>(url: string, init?: RequestInit): Promise<T> => {
     throw new Error(message)
   }
 
+  if (response.status === 204) {
+    return undefined as T
+  }
+
   return response.json()
 }
 
@@ -204,4 +208,18 @@ export const fetchCaseReports = async (caseId: string): Promise<CaseReport[]> =>
     return []
   }
   return data.map(mapReport)
+}
+
+export const reorderCaseSamples = async (caseId: string, sampleIds: string[]): Promise<void> => {
+  await jsonRequest<void>(`${API_BASE_URL}/cases/${caseId}/samples/order`, {
+    method: 'PUT',
+    body: JSON.stringify({ ids: sampleIds }),
+  })
+}
+
+export const reorderCaseReports = async (caseId: string, reportIds: string[]): Promise<void> => {
+  await jsonRequest<void>(`${API_BASE_URL}/cases/${caseId}/reports/order`, {
+    method: 'PUT',
+    body: JSON.stringify({ ids: reportIds }),
+  })
 }

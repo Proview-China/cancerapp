@@ -2,7 +2,12 @@ import { Router } from 'express'
 import multer from 'multer'
 import crypto from 'node:crypto'
 import { pool } from '../db/pool.js'
-import { ensureCaseReportsTable, ensureSampleTissueAnalysisTable } from '../db/init.js'
+import {
+  ensureCaseReportsSortOrder,
+  ensureCaseReportsTable,
+  ensureCaseSamplesSortOrder,
+  ensureSampleTissueAnalysisTable,
+} from '../db/init.js'
 import { storeFile, sanitizeSegment, deleteStoredFile } from '../utils/fileStorage.js'
 import type {
   CaseReportRecord,
@@ -281,12 +286,15 @@ const fetchRowsByCaseIds = async (table: 'case_samples' | 'case_reports', ids: s
     return []
   }
   const placeholders = ids.map((_, index) => `$${index + 1}`).join(', ')
-  const query = `SELECT * FROM ${table} WHERE case_id IN (${placeholders}) ORDER BY created_at DESC`
+  const orderClause = `${table}.sort_order ASC NULLS LAST, ${table}.created_at DESC`
+  const query = `SELECT * FROM ${table} WHERE case_id IN (${placeholders}) ORDER BY ${orderClause}`
   const result = await pool.query(query, ids)
   return result.rows
 }
 
 const fetchCaseWithRelations = async (caseId: string): Promise<CaseWithRelations | null> => {
+  await Promise.all([ensureCaseSamplesSortOrder(), ensureCaseReportsSortOrder(), ensureSampleTissueAnalysisTable()])
+
   const caseResult = await pool.query('SELECT * FROM cases WHERE id = $1', [caseId])
   if (caseResult.rowCount === 0) {
     return null
@@ -294,8 +302,14 @@ const fetchCaseWithRelations = async (caseId: string): Promise<CaseWithRelations
 
   const row = caseResult.rows[0]
   const [samplesResult, reportsResult] = await Promise.all([
-    pool.query('SELECT * FROM case_samples WHERE case_id = $1 ORDER BY created_at DESC', [caseId]),
-    pool.query('SELECT * FROM case_reports WHERE case_id = $1 ORDER BY created_at DESC', [caseId]),
+    pool.query(
+      'SELECT * FROM case_samples WHERE case_id = $1 ORDER BY sort_order ASC NULLS LAST, created_at DESC',
+      [caseId],
+    ),
+    pool.query(
+      'SELECT * FROM case_reports WHERE case_id = $1 ORDER BY sort_order ASC NULLS LAST, created_at DESC',
+      [caseId],
+    ),
   ])
 
   const samples = mapSamples(samplesResult.rows)
@@ -357,7 +371,12 @@ const fetchCaseWithRelations = async (caseId: string): Promise<CaseWithRelations
 
 casesRouter.get('/', async (_req, res) => {
   try {
-    await Promise.all([ensureCaseReportsTable(), ensureSampleTissueAnalysisTable()])
+    await Promise.all([
+      ensureCaseReportsTable(),
+      ensureCaseSamplesSortOrder(),
+      ensureCaseReportsSortOrder(),
+      ensureSampleTissueAnalysisTable(),
+    ])
     const casesResult = await pool.query('SELECT * FROM cases ORDER BY created_at DESC')
     const caseRows = casesResult.rows
 
@@ -509,7 +528,7 @@ casesRouter.post('/', upload.array('sampleFiles'), async (req, res) => {
   const client = await pool.connect()
 
   try {
-    await ensureCaseReportsTable()
+    await Promise.all([ensureCaseSamplesSortOrder(), ensureCaseReportsSortOrder(), ensureCaseReportsTable()])
     await client.query('BEGIN')
 
     const caseResult = await client.query(
@@ -531,6 +550,13 @@ casesRouter.post('/', upload.array('sampleFiles'), async (req, res) => {
          GROUP BY modality`,
         [caseRow.id],
       )
+
+      const sortResult = await client.query(
+        'SELECT COALESCE(MAX(sort_order), 0) AS max_order FROM case_samples WHERE case_id = $1',
+        [caseRow.id],
+      )
+
+      let nextSampleOrder = Number(sortResult.rows[0]?.max_order ?? 0)
 
       const modalityCounters = new Map<Modality, number>()
       for (const row of countsResult.rows) {
@@ -556,9 +582,11 @@ casesRouter.post('/', upload.array('sampleFiles'), async (req, res) => {
         const storedFilename = stored.publicPath.split('/').pop() ?? file.originalname
         const friendlyName = meta.displayName || `${caseRow.identifier}_${meta.modality}_${nextIndex}`
 
+        nextSampleOrder += 1
+
         await client.query(
-          `INSERT INTO case_samples (case_id, modality, description, original_filename, storage_path, storage_thumbnail, checksum)
-           VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+          `INSERT INTO case_samples (case_id, modality, description, original_filename, storage_path, storage_thumbnail, checksum, sort_order)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
           [
             caseRow.id,
             meta.modality,
@@ -567,17 +595,24 @@ casesRouter.post('/', upload.array('sampleFiles'), async (req, res) => {
             stored.publicPath,
             stored.publicPath,
             checksum,
+            nextSampleOrder,
           ],
         )
       }
     }
 
     if (textReportsPayload.length > 0) {
+      const sortResult = await client.query(
+        'SELECT COALESCE(MAX(sort_order), 0) AS max_order FROM case_reports WHERE case_id = $1',
+        [caseRow.id],
+      )
+      let nextOrder = Number(sortResult.rows[0]?.max_order ?? 0)
       for (const report of textReportsPayload) {
+        nextOrder += 1
         await client.query(
-          `INSERT INTO case_reports (case_id, title, summary, content, tags, metadata)
-           VALUES ($1, $2, $3, $4, $5, $6)`,
-          [caseRow.id, report.title, report.summary, report.content, report.tags, report.metadata],
+          `INSERT INTO case_reports (case_id, title, summary, content, tags, metadata, sort_order)
+           VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+          [caseRow.id, report.title, report.summary, report.content, report.tags, report.metadata, nextOrder],
         )
       }
     }
@@ -585,8 +620,14 @@ casesRouter.post('/', upload.array('sampleFiles'), async (req, res) => {
     await client.query('COMMIT')
 
     const [samplesResult, reportsResult] = await Promise.all([
-      pool.query('SELECT * FROM case_samples WHERE case_id = $1 ORDER BY created_at DESC', [caseRow.id]),
-      pool.query('SELECT * FROM case_reports WHERE case_id = $1 ORDER BY created_at DESC', [caseRow.id]),
+      pool.query(
+        'SELECT * FROM case_samples WHERE case_id = $1 ORDER BY sort_order ASC NULLS LAST, created_at DESC',
+        [caseRow.id],
+      ),
+      pool.query(
+        'SELECT * FROM case_reports WHERE case_id = $1 ORDER BY sort_order ASC NULLS LAST, created_at DESC',
+        [caseRow.id],
+      ),
     ])
 
     const response: CaseWithRelations = {
@@ -820,10 +861,10 @@ casesRouter.get('/:caseId/samples/:sampleId/analysis', async (req, res) => {
 casesRouter.get('/:caseId/reports', async (req, res) => {
   const { caseId } = req.params
   try {
-    await ensureCaseReportsTable()
+    await Promise.all([ensureCaseReportsTable(), ensureCaseReportsSortOrder()])
     await assertCaseExists(caseId)
     const reportsResult = await pool.query(
-      'SELECT * FROM case_reports WHERE case_id = $1 ORDER BY created_at DESC',
+      'SELECT * FROM case_reports WHERE case_id = $1 ORDER BY sort_order ASC NULLS LAST, created_at DESC',
       [caseId],
     )
     res.json(mapReports(reportsResult.rows))
@@ -840,14 +881,19 @@ casesRouter.get('/:caseId/reports', async (req, res) => {
 casesRouter.post('/:caseId/reports', async (req, res) => {
   const { caseId } = req.params
   try {
-    await ensureCaseReportsTable()
+    await Promise.all([ensureCaseReportsTable(), ensureCaseReportsSortOrder()])
     const payload = normalizeReportForInsert(req.body)
     await assertCaseExists(caseId)
+    const orderResult = await pool.query(
+      'SELECT COALESCE(MAX(sort_order), 0) AS max_order FROM case_reports WHERE case_id = $1',
+      [caseId],
+    )
+    const nextOrder = Number(orderResult.rows[0]?.max_order ?? 0) + 1
     const insertResult = await pool.query(
-      `INSERT INTO case_reports (case_id, title, summary, content, tags, metadata)
-       VALUES ($1, $2, $3, $4, $5, $6)
+      `INSERT INTO case_reports (case_id, title, summary, content, tags, metadata, sort_order)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
        RETURNING *`,
-      [caseId, payload.title, payload.summary, payload.content, payload.tags, payload.metadata],
+      [caseId, payload.title, payload.summary, payload.content, payload.tags, payload.metadata, nextOrder],
     )
     res.status(201).json(mapReports(insertResult.rows)[0])
   } catch (error) {
@@ -910,6 +956,150 @@ casesRouter.patch('/:caseId/reports/:reportId', async (req, res) => {
     }
     console.error('更新文字病历失败', error)
     res.status(500).json({ message: '更新文字病历失败' })
+  }
+})
+
+casesRouter.put('/:caseId/samples/order', async (req, res) => {
+  const { caseId } = req.params
+  const { ids } = (req.body ?? {}) as { ids?: unknown }
+
+  try {
+    await ensureCaseSamplesSortOrder()
+    await assertCaseExists(caseId)
+
+    if (!Array.isArray(ids) || ids.length === 0) {
+      throw new HttpError(400, 'ids 必须是非空数组')
+    }
+
+    const orderedIds = ids.map((id, index) => {
+      if (typeof id !== 'string') {
+        throw new HttpError(400, `第 ${index + 1} 项 id 必须是字符串`)
+      }
+      const trimmed = id.trim()
+      if (!trimmed) {
+        throw new HttpError(400, `第 ${index + 1} 项 id 不能为空`)
+      }
+      return trimmed
+    })
+
+    const existingResult = await pool.query('SELECT id FROM case_samples WHERE case_id = $1', [caseId])
+    const existingIds = existingResult.rows.map((row) => String(row.id))
+
+    if (existingIds.length !== orderedIds.length) {
+      throw new HttpError(400, 'ids 数量必须与当前样本数一致')
+    }
+
+    const setExisting = new Set(existingIds)
+    const setIncoming = new Set(orderedIds)
+
+    if (setExisting.size !== setIncoming.size) {
+      throw new HttpError(400, 'ids 列表存在重复项或缺失项')
+    }
+
+    for (const id of orderedIds) {
+      if (!setExisting.has(id)) {
+        throw new HttpError(400, 'ids 列表包含不属于该病例的样本')
+      }
+    }
+
+    const client = await pool.connect()
+    try {
+      await client.query('BEGIN')
+      for (let index = 0; index < orderedIds.length; index += 1) {
+        const sortOrder = index + 1
+        await client.query(
+          'UPDATE case_samples SET sort_order = $1, updated_at = NOW() WHERE id = $2 AND case_id = $3',
+          [sortOrder, orderedIds[index], caseId],
+        )
+      }
+      await client.query('COMMIT')
+    } catch (error) {
+      await client.query('ROLLBACK')
+      throw error
+    } finally {
+      client.release()
+    }
+
+    res.status(204).send()
+  } catch (error) {
+    if (error instanceof HttpError) {
+      res.status(error.status).json({ message: error.message })
+      return
+    }
+    console.error('重排样本顺序失败', error)
+    res.status(500).json({ message: '重排样本顺序失败' })
+  }
+})
+
+casesRouter.put('/:caseId/reports/order', async (req, res) => {
+  const { caseId } = req.params
+  const { ids } = (req.body ?? {}) as { ids?: unknown }
+
+  try {
+    await ensureCaseReportsSortOrder()
+    await assertCaseExists(caseId)
+
+    if (!Array.isArray(ids) || ids.length === 0) {
+      throw new HttpError(400, 'ids 必须是非空数组')
+    }
+
+    const orderedIds = ids.map((id, index) => {
+      if (typeof id !== 'string') {
+        throw new HttpError(400, `第 ${index + 1} 项 id 必须是字符串`)
+      }
+      const trimmed = id.trim()
+      if (!trimmed) {
+        throw new HttpError(400, `第 ${index + 1} 项 id 不能为空`)
+      }
+      return trimmed
+    })
+
+    const existingResult = await pool.query('SELECT id FROM case_reports WHERE case_id = $1', [caseId])
+    const existingIds = existingResult.rows.map((row) => String(row.id))
+
+    if (existingIds.length !== orderedIds.length) {
+      throw new HttpError(400, 'ids 数量必须与当前文字病历数一致')
+    }
+
+    const setExisting = new Set(existingIds)
+    const setIncoming = new Set(orderedIds)
+
+    if (setExisting.size !== setIncoming.size) {
+      throw new HttpError(400, 'ids 列表存在重复项或缺失项')
+    }
+
+    for (const id of orderedIds) {
+      if (!setExisting.has(id)) {
+        throw new HttpError(400, 'ids 列表包含不属于该病例的文字病历')
+      }
+    }
+
+    const client = await pool.connect()
+    try {
+      await client.query('BEGIN')
+      for (let index = 0; index < orderedIds.length; index += 1) {
+        const sortOrder = index + 1
+        await client.query(
+          'UPDATE case_reports SET sort_order = $1, updated_at = NOW() WHERE id = $2 AND case_id = $3',
+          [sortOrder, orderedIds[index], caseId],
+        )
+      }
+      await client.query('COMMIT')
+    } catch (error) {
+      await client.query('ROLLBACK')
+      throw error
+    } finally {
+      client.release()
+    }
+
+    res.status(204).send()
+  } catch (error) {
+    if (error instanceof HttpError) {
+      res.status(error.status).json({ message: error.message })
+      return
+    }
+    console.error('重排文字病历顺序失败', error)
+    res.status(500).json({ message: '重排文字病历顺序失败' })
   }
 })
 

@@ -54,6 +54,16 @@
   gap: 10px;
 }
 
+.pond-label {
+  font-size: 0.95rem;
+  color: var(--text-secondary);
+}
+
+.preferences-hint {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
 /* 网格布局 - 用于按钮组 */
 .preferences-volcano__grid {
   display: grid;

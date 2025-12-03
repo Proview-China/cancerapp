@@ -89,7 +89,7 @@
 
 .case-viewer,
 .case-analysis-panel {
-  flex: 0 0 auto;
+  flex: 0 1 auto;
   min-width: 0;
   width: 100%;
   border-radius: 22px;
@@ -361,8 +361,8 @@
 }
 
 .case-analysis-panel.is-ai {
-  padding: 0;           /* 去除外边距，让内容充满 */
-  background: transparent; /* 取消外层米白，改由内层池塘承载 */
+  padding: 12px 8px 14px; /* 上下也收窄一些，让右侧更贴近外框并与左侧高度感一致 */
+  background: transparent;
   box-shadow: none;
 }
 
@@ -489,7 +489,7 @@
   display: flex;
   flex-direction: column;
   min-height: 0;
-  margin-right: 28px; /* 还原内收方式 */
+  margin-right: 0; /* 右侧间距交给外层 panel 控制，避免过大 */
 }
 
 .ai-pond__header {
@@ -521,23 +521,31 @@
   flex: 1;
   min-height: 0;
   display: flex;
-  overflow: hidden;
+  flex-direction: column;
+  overflow: hidden; /* 避免外层滚动，由内部组件（如 AIChatPanel）自己处理滚动 */
 }
 
 .ai-mode__content {
   flex: 1;
   min-height: 0;
   width: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .ai-mode__content--text {
   display: flex;
-  overflow: hidden;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden; /* 文本模式（AI对话）由内部 ai-chat__messages 滚动 */
 }
 
 .ai-mode__content--text .ai-chat {
   flex: 1;
   min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .ai-mode__content--viz {
@@ -673,10 +681,9 @@
   position: absolute;
   border: 2px solid rgba(240, 230, 210, 0.9);
   background: rgba(240, 230, 210, 0.22);
-  border-radius: 10px;
+  border-radius: 6px;
   transform: translate(-50%, -50%);
   box-shadow: 0 0 0 1px rgba(120, 110, 100, 0.15);
-  transition: all 0.15s ease;
   min-width: 8px;
   min-height: 8px;
 }

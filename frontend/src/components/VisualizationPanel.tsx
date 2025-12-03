@@ -575,17 +575,22 @@ export const VisualizationPanel = ({ caseId, sampleId, cases }: VisualizationPan
       return rate
     })()
 
+    // 向左上轻移，避免与右侧图例冲突
+    // 再向左上移，继续给右侧图例留出空间
+    const pieCenter = ['25%', '52%'] as const
+
     pieChart.current.setOption(
       {
         backgroundColor: 'rgba(0,0,0,0)',
         legend: {
-          type: 'scroll',
-          top: 2,
-          left: 'center',
-          orient: 'horizontal',
-          itemWidth: 10,
-          itemHeight: 10,
-          pageIconColor: '#8a6d3b',
+          type: 'plain',
+          orient: 'vertical',
+          right: 16,
+          top: 'middle',
+          align: 'left',
+          itemWidth: 12,
+          itemHeight: 12,
+          formatter: (name: string) => name,
         },
         series: [
           // 中心仪表
@@ -593,8 +598,8 @@ export const VisualizationPanel = ({ caseId, sampleId, cases }: VisualizationPan
             type: 'gauge',
             startAngle: 220,
             endAngle: -40,
-            center: ['50%', '60%'],
-            radius: '22%',
+            center: pieCenter,
+            radius: '18%',
             min: 0,
             max: 1,
             axisLine: { lineStyle: { width: 6, color: [[1, '#f39c12']] } },
@@ -609,8 +614,8 @@ export const VisualizationPanel = ({ caseId, sampleId, cases }: VisualizationPan
           // R1 风险分层环
           {
             type: 'pie',
-            center: ['50%', '60%'],
-            radius: ['30%', '36%'],
+            center: pieCenter,
+            radius: ['22%', '28%'],
             label: { show: false },
             itemStyle: { borderColor: '#fff', borderWidth: 1 },
             data: [
@@ -624,8 +629,8 @@ export const VisualizationPanel = ({ caseId, sampleId, cases }: VisualizationPan
           // R2 特征贡献环
           {
             type: 'pie',
-            center: ['50%', '60%'],
-            radius: ['40%', '54%'],
+            center: pieCenter,
+            radius: ['32%', '44%'],
             label: { show: false },
             itemStyle: { borderColor: '#fff', borderWidth: 1 },
             data: contrib.map((c) => ({ name: c.name, value: c.weight, itemStyle: { color: echartsYlOrRd(c.mean) }, mean: c.mean })),
@@ -635,8 +640,8 @@ export const VisualizationPanel = ({ caseId, sampleId, cases }: VisualizationPan
           // R3 分位细分环（简化：按全库分位统计，每特征 5 段）
           {
             type: 'pie',
-            center: ['50%', '60%'],
-            radius: ['58%', '66%'],
+            center: pieCenter,
+            radius: ['48%', '56%'],
             label: { show: false },
             itemStyle: { borderColor: '#fff', borderWidth: 1 },
             data: (() => {
@@ -666,8 +671,8 @@ export const VisualizationPanel = ({ caseId, sampleId, cases }: VisualizationPan
           // R4 HSI 组成环
           {
             type: 'pie',
-            center: ['50%', '60%'],
-            radius: ['70%', '78%'],
+            center: pieCenter,
+            radius: ['60%', '68%'],
             label: { show: false },
             itemStyle: { borderColor: '#fff', borderWidth: 1 },
             data: [
@@ -680,8 +685,8 @@ export const VisualizationPanel = ({ caseId, sampleId, cases }: VisualizationPan
           // R5 缺失率窄环
           {
             type: 'pie',
-            center: ['50%', '60%'],
-            radius: ['82%', '86%'],
+            center: pieCenter,
+            radius: ['72%', '78%'],
             label: { show: false },
             itemStyle: { borderColor: '#fff', borderWidth: 1 },
             data: missRates.map((r) => ({ name: `缺失·${r.f}`, value: Math.max(r.miss, 0.001), itemStyle: { color: `rgba(120,120,120,${0.3 + 0.7 * r.miss})` } })),
@@ -720,10 +725,21 @@ export const VisualizationPanel = ({ caseId, sampleId, cases }: VisualizationPan
             return ''
           },
         },
-        grid: { top: 10, left: '12%', right: '12%', bottom: 36, containLabel: true },
+        grid: { top: 10, left: '12%', right: '14%', bottom: 12, containLabel: true },
         xAxis: { type: 'category', data: cols, axisTick: { show: false } },
         yAxis: { type: 'category', data: rows, axisTick: { show: false } },
-        visualMap: [{ min: 0, max: 1, calculable: false, orient: 'horizontal', left: 'center', bottom: 12, inRange: { color: ylOrRdColors } }],
+        visualMap: [
+          {
+            min: 0,
+            max: 1,
+            calculable: false,
+            orient: 'vertical',
+            right: 6,
+            top: 24,
+            bottom: 24,
+            inRange: { color: ylOrRdColors },
+          },
+        ],
         series: [
           {
             type: 'heatmap',

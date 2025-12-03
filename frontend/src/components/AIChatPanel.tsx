@@ -2,21 +2,10 @@ import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRe
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import './AIChatPanel.css'
+import type { ChatMessage } from '../types/chat'
+import { fetchAIConfig, streamChat, type AIConfig } from '../services/aiService'
 
-type ChatRole = 'user' | 'assistant'
-
-type Attachment = {
-  id: string
-  name: string
-  size: number
-}
-
-type ChatMessage = {
-  id: string
-  role: ChatRole
-  text: string
-  attachments?: Attachment[]
-}
+type Attachment = { id: string; name: string; size: number }
 
 export type AIChatHandle = {
   newChat: () => void
@@ -25,6 +14,7 @@ export type AIChatHandle = {
 
 type Props = {
   caseId: string | null
+  contextText?: string | null
 }
 
 const createId = () =>
@@ -32,17 +22,31 @@ const createId = () =>
     ? crypto.randomUUID()
     : `${Date.now()}-${Math.random().toString(16).slice(2)}`
 
-export const AIChatPanel = forwardRef<AIChatHandle, Props>(({ caseId }, ref) => {
+export const AIChatPanel = forwardRef<AIChatHandle, Props>(({ caseId, contextText }, ref) => {
   const storageRef = useRef<Map<string, ChatMessage[]>>(new Map())
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [text, setText] = useState('')
   const [pendingFiles, setPendingFiles] = useState<File[]>([])
   const [previewUrls, setPreviewUrls] = useState<string[]>([])
+  const [isStreaming, setIsStreaming] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [aiConfig, setAIConfig] = useState<AIConfig | null>(null)
   const listRef = useRef<HTMLDivElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  const DEFAULT_MD_URL = `${import.meta.env.BASE_URL ?? '/'}demo_fake/fake%20ai.txt`
+  const ensureGreeting = useCallback(() => {
+    const key = caseId ?? '__no_case__'
+    const existing = storageRef.current.get(key) ?? []
+    if (existing.length > 0) return
+    const hello: ChatMessage = {
+      id: createId(),
+      role: 'assistant',
+      text: '你好，我是智能病理助手，可以帮你解读病例和影像，有问题随时问我。',
+    }
+    storageRef.current.set(key, [hello])
+    setMessages([hello])
+  }, [caseId])
 
   const syncFromStorage = useCallback(() => {
     const key = caseId ?? '__no_case__'
@@ -60,33 +64,24 @@ export const AIChatPanel = forwardRef<AIChatHandle, Props>(({ caseId }, ref) => 
 
   useEffect(() => {
     syncFromStorage()
-  }, [syncFromStorage])
+    ensureGreeting()
+  }, [ensureGreeting, syncFromStorage])
 
-  // 聊天区域滚动禁用：不自动滚动，不设置 scrollTop
+  useEffect(() => {
+    fetchAIConfig()
+      .then(setAIConfig)
+      .catch(() => setAIConfig(null))
+  }, [])
+
+  // 聊天区域滚动：收到新内容时自动滚动到底
+  useEffect(() => {
+    if (!listRef.current) return
+    listRef.current.scrollTop = listRef.current.scrollHeight
+  }, [messages])
 
   const focusInput = () => {
     inputRef.current?.focus()
   }
-
-  const seedDefaultAssistant = useCallback(async () => {
-    const key = caseId ?? '__no_case__'
-    const existing = storageRef.current.get(key) ?? []
-    if (existing.length > 0) return
-
-    let md = ''
-    try {
-      const res = await fetch(DEFAULT_MD_URL)
-      if (res.ok) md = await res.text()
-      else throw new Error(`HTTP ${res.status}`)
-    } catch (err) {
-      md = `无法读取 demo_fake/fake ai.txt\n\n> 错误: ${(err as Error).message}`
-    }
-
-    const reply: ChatMessage = { id: createId(), role: 'assistant', text: md }
-    const next = [...existing, reply]
-    storageRef.current.set(key, next)
-    setMessages(next)
-  }, [caseId, DEFAULT_MD_URL])
 
   useImperativeHandle(
     ref,
@@ -96,12 +91,12 @@ export const AIChatPanel = forwardRef<AIChatHandle, Props>(({ caseId }, ref) => 
         setText('')
         setPendingFiles([])
         setPreviewUrls([])
-        seedDefaultAssistant()
+        ensureGreeting()
         focusInput()
       },
       focusInput,
     }),
-    [saveToStorage, seedDefaultAssistant],
+    [ensureGreeting, saveToStorage],
   )
 
   const handlePickFiles = useCallback((files: FileList | null) => {
@@ -114,21 +109,51 @@ export const AIChatPanel = forwardRef<AIChatHandle, Props>(({ caseId }, ref) => 
     [pendingFiles],
   )
 
-  const handleSend = useCallback(() => {
+  const handleSend = useCallback(async () => {
     const trimmed = text.trim()
     if (!trimmed && attachments.length === 0) return
+    if (!aiConfig?.hasApiKey) {
+      setError('未配置 DeepSeek API Key，请在“设置-后台行为”填写。')
+      return
+    }
+
+    setError(null)
     const userMsg: ChatMessage = {
       id: createId(),
       role: 'user',
       text: trimmed,
       attachments,
     }
-    const next = [...messages, userMsg]
-    saveToStorage(next)
+    const assistantId = createId()
+    const assistantMsg: ChatMessage = { id: assistantId, role: 'assistant', text: '' }
+    const history = [...messages, userMsg, assistantMsg]
+    saveToStorage(history)
     setText('')
     setPendingFiles([])
     setPreviewUrls([])
-  }, [attachments, messages, saveToStorage, text])
+    setIsStreaming(true)
+
+    try {
+      await streamChat(history.filter((m) => m.role !== 'system'), {
+        caseId: caseId ?? undefined,
+        model: aiConfig.model,
+        contextText: contextText ?? null,
+        onChunk: (chunk) => {
+          setMessages((prev) =>
+            prev.map((m) => (m.id === assistantId ? { ...m, text: m.text + chunk } : m)),
+          )
+        },
+      })
+    } catch (err) {
+      const message = err instanceof Error ? err.message : '调用 AI 失败'
+      setMessages((prev) =>
+        prev.map((m) => (m.id === assistantId ? { ...m, text: `⚠️ ${message}` } : m)),
+      )
+      setError(message)
+    } finally {
+      setIsStreaming(false)
+    }
+  }, [attachments, messages, saveToStorage, text, aiConfig, caseId, contextText])
 
   const removePendingFile = useCallback((index: number) => {
     setPendingFiles((prev) => prev.filter((_, i) => i !== index))
@@ -150,16 +175,18 @@ export const AIChatPanel = forwardRef<AIChatHandle, Props>(({ caseId }, ref) => 
     }
   }, [pendingFiles])
 
-  // 初次渲染或切换病例时，如果该会话为空，则在首次回复前输出默认 Markdown
-  useEffect(() => {
-    if (messages.length === 0) {
-      seedDefaultAssistant()
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [caseId, messages.length])
-
   return (
     <div className="ai-chat" role="region" aria-label="AI 对话">
+      {!aiConfig?.hasApiKey ? (
+        <div className="ai-chat__config-hint" role="alert">
+          未配置 DeepSeek API Key，无法调用真实回答。请前往“设置 &gt; 后台行为”填写。
+        </div>
+      ) : null}
+      {error ? (
+        <div className="ai-chat__config-hint" role="alert">
+          {error}
+        </div>
+      ) : null}
       <div className="ai-chat__messages" ref={listRef}>
         {messages.map((m) => (
           <div key={m.id} className={["ai-bubble", `ai-bubble--${m.role}`].join(' ')}>
@@ -217,14 +244,20 @@ export const AIChatPanel = forwardRef<AIChatHandle, Props>(({ caseId }, ref) => 
           >
             ＋
           </button>
-          <input
-            ref={inputRef}
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            placeholder="请输入你想询问的问题"
-            className="ai-chat__input"
-            aria-label="输入消息"
-          />
+        <input
+          ref={inputRef}
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder="请输入你想询问的问题"
+          className="ai-chat__input"
+          aria-label="输入消息"
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault()
+              handleSend()
+            }
+          }}
+        />
         </div>
         <input ref={fileRef} type="file" multiple onChange={(e) => handlePickFiles(e.target.files)} style={{ display: 'none' }} />
         <button
@@ -233,6 +266,7 @@ export const AIChatPanel = forwardRef<AIChatHandle, Props>(({ caseId }, ref) => 
           onClick={handleSend}
           aria-label="发送"
           title="发送"
+          disabled={isStreaming || !aiConfig?.hasApiKey}
         >
           ➤
         </button>

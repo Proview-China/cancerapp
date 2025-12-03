@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, lazy, Suspense } from 'react'
-import type { CaseRecord, CaseReportDraft, TissueAnalysis } from '../types/cases'
+import type { CaseRecord, CaseReport, CaseSample, CaseReportDraft, TissueAnalysis } from '../types/cases'
 import type { KeyboardEvent as ReactKeyboardEvent, PointerEvent as ReactPointerEvent } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -41,6 +41,7 @@ export const CasesWorkspace = ({
   onUpdateReport,
   rightMode: outerRightMode = 'analysis',
 }: CasesWorkspaceProps) => {
+  const initialSplitRatio = outerRightMode === 'ai' ? 0.48 : 0.56
   const [viewport, setViewport] = useState<ViewportState>({ scale: 1, minScale: 1, offsetX: 0, offsetY: 0 })
   const [isDragging, setIsDragging] = useState(false)
   const [imageMeta, setImageMeta] = useState({ width: 0, height: 0 })
@@ -53,7 +54,7 @@ export const CasesWorkspace = ({
     active: false,
     pointerId: 0,
     startX: 0,
-    baseRatio: 0.56,
+    baseRatio: initialSplitRatio,
   })
   const dragStateRef = useRef({
     active: false,
@@ -63,7 +64,7 @@ export const CasesWorkspace = ({
     baseOffsetX: 0,
     baseOffsetY: 0,
   })
-  const [splitRatio, setSplitRatio] = useState(0.56)
+  const [splitRatio, setSplitRatio] = useState(initialSplitRatio)
   const [isSplitDragging, setIsSplitDragging] = useState(false)
   const [isMarkdownEditing, setIsMarkdownEditing] = useState(false)
   const [markdownDraft, setMarkdownDraft] = useState('')
@@ -103,6 +104,15 @@ export const CasesWorkspace = ({
     if (!selectedSampleId) return null
     return selectedCase.samples.find((sample) => sample.id === selectedSampleId) ?? null
   }, [selectedCase, selectedSampleId])
+
+  const caseTextContext = useMemo(() => {
+    if (!selectedCase) return null
+    const reports = selectedCase.reports?.slice(0, 4) ?? []
+    if (reports.length === 0) return null
+    return reports
+      .map((r) => `${r.title || '未命名'}\n${(r.content || '').slice(0, 1000)}`)
+      .join('\n\n')
+  }, [selectedCase])
 
   const selectedReport = useMemo(() => {
     if (!selectedCase) return null
@@ -161,7 +171,7 @@ export const CasesWorkspace = ({
     return () => {
       observer.disconnect()
     }
-  }, [])
+  }, [selectedSampleId])
 
   const computeFitScale = useCallback((imgWidth: number, imgHeight: number, contWidth: number, contHeight: number) => {
     if (!imgWidth || !imgHeight || !contWidth || !contHeight) return 1
@@ -455,22 +465,31 @@ export const CasesWorkspace = ({
       return null
     }
 
+    const containerEl = containerRef.current
+    const fallbackRect = containerEl?.getBoundingClientRect()
+    const viewportWidth = containerSize.width || fallbackRect?.width || 0
+    const viewportHeight = containerSize.height || fallbackRect?.height || 0
+
+    if (!viewportWidth || !viewportHeight) {
+      return null
+    }
+
     const minimapWidth = 160
     const minimapHeight = (imageMeta.height / imageMeta.width) * minimapWidth
     const { scale, offsetX, offsetY } = viewport
 
     const leftRatio = clamp(
-      ((-containerSize.width / 2 - offsetX) / scale + imageMeta.width / 2) / imageMeta.width,
+      ((-viewportWidth / 2 - offsetX) / scale + imageMeta.width / 2) / imageMeta.width,
       0,
       1,
     )
     const topRatio = clamp(
-      ((-containerSize.height / 2 - offsetY) / scale + imageMeta.height / 2) / imageMeta.height,
+      ((-viewportHeight / 2 - offsetY) / scale + imageMeta.height / 2) / imageMeta.height,
       0,
       1,
     )
-    const widthRatio = clamp(containerSize.width / (imageMeta.width * scale), 0, 1)
-    const heightRatio = clamp(containerSize.height / (imageMeta.height * scale), 0, 1)
+    const widthRatio = clamp(viewportWidth / (imageMeta.width * scale), 0, 1)
+    const heightRatio = clamp(viewportHeight / (imageMeta.height * scale), 0, 1)
 
     // 左/上是可视区域左上角；由于最小图框采用 translate(-50%,-50%)，
     // 需要把 left/top 设置为中心点：left = leftRatio + widthRatio/2
@@ -683,7 +702,7 @@ export const CasesWorkspace = ({
                   <div className="ai-pond__body">
                     {rightMode === 'ai' ? (
                       <div id="right-panel-ai" role="tabpanel" aria-labelledby="right-tab-ai" className="ai-mode__content ai-mode__content--text">
-                        <AIChatPanel ref={chatRef} caseId={selectedCase.id} />
+                        <AIChatPanel ref={chatRef} caseId={selectedCase.id} contextText={caseTextContext} />
                       </div>
                     ) : selectedSample ? (
                       <div id="right-panel-viz" role="tabpanel" aria-labelledby="right-tab-viz" className="ai-mode__content ai-mode__content--viz">
@@ -758,6 +777,23 @@ export const CasesWorkspace = ({
                     <dd>{new Date(selectedReport.updatedAt).toLocaleString()}</dd>
                   </div>
                 </dl>
+                {(() => {
+                  const insight = summarizeTextReport(selectedReport)
+                  return (
+                    <section className="pond" aria-labelledby="pond-text-ai" style={{ marginTop: 12 }}>
+                      <h4 id="pond-text-ai" className="pond__title">预测 & 建议</h4>
+                      <div className="pond__content">
+                        <ReactMarkdown
+                          remarkPlugins={[remarkGfm]}
+                          allowedElements={['h3', 'p', 'strong', 'em', 'ul', 'ol', 'li', 'code', 'blockquote', 'a']}
+                          skipHtml
+                        >
+                          {insight}
+                        </ReactMarkdown>
+                      </div>
+                    </section>
+                  )
+                })()}
               </div>
             ) : selectedCase && selectedSample ? (
               <div className="case-analysis-panel__body">
@@ -771,23 +807,11 @@ export const CasesWorkspace = ({
                     onImagesChange={(imgs) => setHeaderImages(imgs)}
                   />
                 ) : (
-                  <div>
-                    <p>该样本类型不提供此类分析。</p>
-                    <dl>
-                      <div>
-                        <dt>病例</dt>
-                        <dd>{selectedCase.identifier}</dd>
-                      </div>
-                      <div>
-                        <dt>样例类别</dt>
-                        <dd>{selectedSample.modality}</dd>
-                      </div>
-                      <div>
-                        <dt>名称</dt>
-                        <dd>{selectedSample.displayName || '未填写'}</dd>
-                      </div>
-                    </dl>
-                  </div>
+                  <ImagingAnalysisView
+                    caseIdentifier={selectedCase.identifier}
+                    sample={selectedSample as any as CaseSample}
+                    reports={selectedCase.reports as CaseReport[]}
+                  />
                 )}
               </div>
             ) : (
@@ -841,12 +865,50 @@ const fmt = {
 }
 
 const openSystemPath = async (absPath: string | null | undefined) => {
-  if (!absPath) return { ok: false, error: '未提供路径' }
+  if (!absPath) {
+    window.alert?.('暂无可用图像路径')
+    return { ok: false, error: '未提供路径' }
+  }
   const api: any = (window as any).electronAPI
   if (!api || typeof api.openPath !== 'function') {
+    window.alert?.('当前环境不支持外部打开（请在桌面/Electron 环境使用）')
     return { ok: false, error: '当前环境不支持外部打开' }
   }
-  return api.openPath(absPath)
+  const result = await api.openPath(absPath)
+  if (!result?.ok) {
+    const message = result?.error ?? '打开失败，请检查文件是否存在'
+    window.alert?.(message)
+  }
+  return result
+}
+
+const summarizeTextReport = (report: CaseReport) => {
+  const strip = (text: string) => text.replace(/\s+/g, ' ').trim()
+  const sentences = strip(report.content)
+    .split(/(?<=[。！？.?!])\s+/)
+    .map((s) => s.trim())
+    .filter((s) => s.length > 6)
+  const overviewText =
+    (report.summary && report.summary.trim().length > 0 ? strip(report.summary) : sentences.slice(0, 2).join(' ')) || '暂无摘要'
+  const deepList =
+    sentences.slice(2, 4).length > 0
+      ? sentences.slice(2, 4)
+      : ['要点：关注影像/病理的核心结论与时间线', '风险：留意症状、实验室或影像的近期波动']
+  const advice = [
+    '建议：补全随访计划与检验节点，保持时间线闭环',
+    '建议：结合影像/实验室复核重点结论，必要时追加取材或复评',
+  ]
+  const markdown = [
+    '### 预测概述',
+    overviewText,
+    '',
+    '### 深度推理',
+    ...deepList.map((line) => `- ${line}`),
+    '',
+    '### 建议',
+    ...advice.map((line) => `- ${line}`),
+  ].join('\n')
+  return markdown
 }
 
 const TissueAnalysisView = ({
@@ -973,6 +1035,98 @@ const TissueAnalysisView = ({
   )
 }
 
+const ImagingAnalysisView = ({
+  caseIdentifier,
+  sample,
+  reports,
+}: {
+  caseIdentifier: string
+  sample: CaseSample
+  reports: CaseReport[]
+}) => {
+  const [report, setReport] = useState<CaseReport | null>(null)
+
+  useEffect(() => {
+    const source = sample.modality === 'CT片' ? 'demo-ct' : sample.modality === '核磁共振片' ? 'demo-mri' : null
+    if (!source) {
+      setReport(null)
+      return
+    }
+    const match = reports.find((report) => {
+      const meta = report.metadata ?? {}
+      const reportSource = (meta as any).source
+      const linkedSampleId = (meta as any).sampleId ?? (meta as any).sample_id
+      return reportSource === source && linkedSampleId === sample.id
+    })
+    setReport(match ?? null)
+  }, [sample.id, sample.modality, reports])
+
+  if (!report) {
+    return (
+      <div className="case-analysis-panel__placeholder">
+        <p>
+          当前 {caseIdentifier} 的 {sample.modality} 暂无“预测 &amp; 建议”内容。
+        </p>
+      </div>
+    )
+  }
+
+  return (
+    <>
+      <dl>
+        <div>
+          <dt>病例</dt>
+          <dd>{caseIdentifier}</dd>
+        </div>
+        <div>
+          <dt>样例类别</dt>
+          <dd>{sample.modality}</dd>
+        </div>
+        <div>
+          <dt>样例名称</dt>
+          <dd>{sample.displayName || sample.originalFilename}</dd>
+        </div>
+        <div>
+          <dt>摘要</dt>
+          <dd>{report.summary || '—'}</dd>
+        </div>
+        <div>
+          <dt>标签</dt>
+          <dd>
+            {report.tags && report.tags.length > 0 ? (
+              report.tags.map((tag) => (
+                <span key={tag} className="report-tag">
+                  {tag}
+                </span>
+              ))
+            ) : (
+              <span>未设置</span>
+            )}
+          </dd>
+        </div>
+        <div>
+          <dt>更新时间</dt>
+          <dd>{new Date(report.updatedAt).toLocaleString()}</dd>
+        </div>
+      </dl>
+      <section className="pond pond--ai" aria-labelledby="pond-imaging-ai" style={{ marginTop: 12 }}>
+        <h4 id="pond-imaging-ai" className="pond__title">
+          {sample.modality} 预测 &amp; 建议
+        </h4>
+        <div className="pond__content">
+          <ReactMarkdown
+            remarkPlugins={[remarkGfm]}
+            allowedElements={['h2', 'h3', 'p', 'strong', 'em', 'ul', 'ol', 'li', 'code', 'blockquote', 'a']}
+            skipHtml
+          >
+            {report.content}
+          </ReactMarkdown>
+        </div>
+      </section>
+    </>
+  )
+}
+
 // 动态加载的可视化面板（延迟导入，避免初始包体积增大）
 const VisualizationPanel = ({ caseId, sampleId, cases }: { caseId: string; sampleId: string; cases: CaseRecord[] }) => {
   const LazyPanel = useMemo(() => lazy(() => import('./VisualizationPanel')), [])
@@ -1004,7 +1158,7 @@ const AIMarkdownSection = ({ index, content: override }: { index: 1 | 2 | 3; con
   return (
     <ReactMarkdown
       remarkPlugins={[remarkGfm]}
-      allowedElements={['h2', 'h3', 'p', 'strong', 'em', 'ul', 'li']}
+      allowedElements={['h2', 'h3', 'p', 'strong', 'em', 'ul', 'ol', 'li']}
       skipHtml
     >
       {content}
