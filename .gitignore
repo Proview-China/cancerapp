@@ -47,3 +47,7 @@ frontend/.vite/
 *.njsproj
 *.sln
 *.sw?
+
+cancerapp.dump
+fake ai.md
+cancerapp-transfer/*
