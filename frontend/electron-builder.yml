@@ -4,8 +4,14 @@ files:
   - dist/**
   - electron/main.cjs
   - electron/preload.cjs
+extraResources:
+  - from: ../backend/dist
+    to: backend
 extraMetadata:
   main: electron/main.cjs
 directories:
   output: release
   buildResources: electron/resources
+win:
+  target:
+    - dir

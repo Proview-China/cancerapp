@@ -2,7 +2,30 @@ const path = require('node:path')
 const { app, BrowserWindow, ipcMain, Menu, dialog, shell } = require('electron')
 const fs = require('node:fs/promises')
 
-const isDev = process.env.NODE_ENV !== 'production'
+// 使用 app.isPackaged 判断环境，避免依赖 NODE_ENV 导致打包后仍走开发路径
+const isDev = !app.isPackaged
+
+async function startBackend() {
+  if (isDev) return
+  try {
+    const backendEntry = path.join(process.resourcesPath, 'backend', 'server.js')
+    // 在打包环境中，将上传目录固定到 exe 所在目录下的 uploads，便于绿色迁移
+    const appDir = path.dirname(app.getPath('exe'))
+    process.env.UPLOADS_ROOT = process.env.UPLOADS_ROOT || path.join(appDir, 'uploads')
+    // 数据库连接串保持与开发环境一致，必要时可在启动前通过环境变量覆盖
+    process.env.DATABASE_URL =
+      process.env.DATABASE_URL || 'postgres://postgres:aass0371@localhost:5432/cancerapp'
+    process.env.NODE_ENV = 'production'
+
+    // 动态导入后端 server（ESM）
+    const backendUrl = new URL(`file://${backendEntry.replace(/\\/g, '/')}`)
+    await import(backendUrl.href)
+    // server.ts 内部会自行监听端口，无需在此持有引用
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error('启动后端失败：', error)
+  }
+}
 
 app.commandLine.appendSwitch('no-sandbox')
 app.commandLine.appendSwitch('disable-gpu-sandbox')
@@ -58,8 +81,9 @@ function createWindow() {
   }
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   Menu.setApplicationMenu(null)
+  await startBackend()
   createWindow()
 
   app.on('activate', () => {

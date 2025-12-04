@@ -49,5 +49,4 @@ frontend/.vite/
 *.sw?
 
 cancerapp.dump
-fake ai.md
 cancerapp-transfer/*

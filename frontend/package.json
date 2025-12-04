@@ -11,7 +11,7 @@
     "preview": "vite preview",
     "electron:start": "wait-on tcp:localhost:5173 && cross-env NODE_ENV=development electron electron/main.cjs --no-sandbox --disable-gpu-sandbox",
     "electron:dev": "npm run kill-port && concurrently \"npm run dev\" \"npm run electron:start\"",
-    "electron:build": "npm run build && electron-builder"
+    "electron:build": "npm run build && npm --prefix ../backend run build && electron-builder"
   },
   "dependencies": {
     "echarts": "^5.5.0",
