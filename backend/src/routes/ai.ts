@@ -113,8 +113,9 @@ aiRouter.post('/chat', async (req, res) => {
       const reader = upstream.body.getReader()
       const encoder = new TextEncoder()
       const flush = () => {
-        if (typeof res.flush === 'function') {
-          res.flush()
+        const anyRes = res as any
+        if (typeof anyRes.flush === 'function') {
+          anyRes.flush()
         }
       }
 
