@@ -12,6 +12,8 @@
 - **WHEN** DeepSeek base-url 或 api-key 未配置
 - **THEN** 发送入口应提示“未配置”，阻止发送或降级为本地 demo 文案，并引导用户前往“设置-后台行为”填写
 
+## ADDED Requirements
+
 ### Requirement: Settings Backstage Controls
 设置页 MUST 提供“后台行为”配置项。  
 **Modification:** SHALL 新增 DeepSeek/OpenAI base-url、api-key（以及模型可选）的输入与保存按钮；保存后调用后端 `/ai/config` 更新，key 不以明文回显。

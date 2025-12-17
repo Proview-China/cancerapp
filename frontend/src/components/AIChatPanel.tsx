@@ -258,8 +258,6 @@ export const AIChatPanel = forwardRef<AIChatHandle, Props>(({ caseId, contextTex
             }
           }}
         />
-        </div>
-        <input ref={fileRef} type="file" multiple onChange={(e) => handlePickFiles(e.target.files)} style={{ display: 'none' }} />
         <button
           type="button"
           className="ai-send-btn"
@@ -270,6 +268,8 @@ export const AIChatPanel = forwardRef<AIChatHandle, Props>(({ caseId, contextTex
         >
           ➤
         </button>
+        </div>
+        <input ref={fileRef} type="file" multiple onChange={(e) => handlePickFiles(e.target.files)} style={{ display: 'none' }} />
       </div>
     </div>
   )

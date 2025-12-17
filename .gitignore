@@ -10,6 +10,7 @@ lerna-debug.log*
 frontend/node_modules
 frontend/dist
 frontend/dist-ssr
+frontend/release/
 # Backend/build artifacts
 backend/node_modules
 backend/dist

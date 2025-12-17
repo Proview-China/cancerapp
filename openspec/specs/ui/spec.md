@@ -164,11 +164,16 @@ AI 池塘 MUST 支持 h2/h3、段落、无序列表、粗体、斜体；不渲�
 - THEN 可通过键盘完成；数值与单位格式与现有规范一致，空值显示“未提供”
 
 ### Requirement: AI Chat Panel in Analysis Area
-分析页右半“分析区” MUST 显示 AI 聊天面板，以气泡式展现对话，遵循项目的主题与排版风格，不影响左侧病例与预览交互。
+分析页右半“分析区” MUST 显示 AI 聊天面板，以气泡式展现对话，遵循项目的主题与排版风格，不影响左侧病例与预览交互。  
+**Modification:** 聊天面板 MUST 调用后端 `/ai/chat` 流式接口，边流式渲染增量文本，缺省配置时提示用户配置 DeepSeek。
 
-#### Scenario: Bubble layout and theme
-- WHEN 打开分析页
-- THEN 右半区显示气泡式对话列表与输入区，风格与现有按钮/色板一致
+#### Scenario: Streamed AI Reply
+- **WHEN** 用户在“分析”页 AI 面板发送消息
+- **THEN** 面板立即显示用户消息并创建助手占位气泡，随着 `/ai/chat` 的流式响应追加文本，直至完成
+
+#### Scenario: Missing Config Notice
+- **WHEN** DeepSeek base-url 或 api-key 未配置
+- **THEN** 发送入口应提示“未配置”，阻止发送或降级为本地 demo 文案，并引导用户前往“设置-后台行为”填写
 
 ### Requirement: Case-Scoped Conversation Context
 会话上下文 SHALL 以病例（caseId）为粒度隔离；同一病例下的影像/文字共享同一会话；不同病例之间互不影响。
@@ -366,4 +371,12 @@ WeChat 小程序病例列表页 SHALL 采用与桌面端左侧栏一致的卡片
 - **WHEN** 样本排序 API 返回错误或网络请求失败
 - **THEN** 前端 SHALL 回滚到拖拽前的样本顺序
 - **AND** 在侧栏内或顶部以非打断式提示用户“排序保存失败，请稍后重试”
+
+### Requirement: Settings Backstage Controls
+设置页 MUST 提供“后台行为”配置项。  
+**Modification:** SHALL 新增 DeepSeek/OpenAI base-url、api-key（以及模型可选）的输入与保存按钮；保存后调用后端 `/ai/config` 更新，key 不以明文回显。
+
+#### Scenario: Save AI Provider Config
+- **WHEN** 在“设置-后台行为”输入 base-url/api-key 并点击保存
+- **THEN** 前端调用配置接口保存；UI 显示“已配置/未配置”状态，不展示明文 key，后续聊天应使用新配置
 
