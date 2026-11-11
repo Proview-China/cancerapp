@@ -7,7 +7,7 @@ import type {
   TissueAnalysis,
 } from '../types/cases'
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:4000'
+const API_BASE_URL = window.location.origin === 'http://127.0.0.1:4000' ? window.location.origin : (import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:4000')
 
 const mapReport = (report: any): CaseReport => ({
   id: report.id,

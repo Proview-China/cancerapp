@@ -8,7 +8,7 @@ import {
   ensureCaseSamplesSortOrder,
   ensureSampleTissueAnalysisTable,
 } from '../db/init.js'
-import { storeFile, sanitizeSegment, deleteStoredFile } from '../utils/fileStorage.js'
+import { storeFile, deleteStoredFile } from '../utils/fileStorage.js'
 import type {
   CaseReportRecord,
   CaseSampleRecord,
@@ -574,11 +574,7 @@ casesRouter.post('/', upload.array('sampleFiles'), async (req, res) => {
         const nextIndex = (modalityCounters.get(meta.modality) ?? 0) + 1
         modalityCounters.set(meta.modality, nextIndex)
 
-        const identifierSegment = sanitizeSegment(caseRow.identifier)
-        const modalitySegment = sanitizeSegment(meta.modality)
-        const baseName = `${identifierSegment}_${modalitySegment}_${nextIndex}`
-
-        const stored = await storeFile(file, { baseName })
+        const stored = await storeFile(file)
         const storedFilename = stored.publicPath.split('/').pop() ?? file.originalname
         const friendlyName = meta.displayName || `${caseRow.identifier}_${meta.modality}_${nextIndex}`
 

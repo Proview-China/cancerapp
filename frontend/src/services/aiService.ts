@@ -1,6 +1,6 @@
 import type { ChatMessage as UIMessage } from '../types/chat'
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, '') || 'http://localhost:4000'
+const API_BASE = window.location.origin === 'http://127.0.0.1:4000' ? window.location.origin : (import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, '') || 'http://localhost:4000')
 
 export type ChatStreamOptions = {
   caseId?: string | null

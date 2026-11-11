@@ -4,9 +4,14 @@ files:
   - dist/**
   - electron/main.cjs
   - electron/preload.cjs
+  - electron/startup.cjs
 extraResources:
   - from: ../backend/dist
-    to: backend
+    to: backend/dist
+  - from: ../backend/package.json
+    to: backend/package.json
+  - from: ../backend/node_modules
+    to: backend/node_modules
 extraMetadata:
   main: electron/main.cjs
 directories:

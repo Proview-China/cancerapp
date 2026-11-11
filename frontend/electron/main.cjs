@@ -1,30 +1,40 @@
 const path = require('node:path')
 const { app, BrowserWindow, ipcMain, Menu, dialog, shell } = require('electron')
 const fs = require('node:fs/promises')
+const { pathToFileURL } = require('node:url')
+const { listenOwned, startOwnedChild } = require('./startup.cjs')
+const { spawn } = require('node:child_process')
 
 // 使用 app.isPackaged 判断环境，避免依赖 NODE_ENV 导致打包后仍走开发路径
 const isDev = !app.isPackaged
+let devChild
+let quitting = false
 
 async function startBackend() {
-  if (isDev) return
-  try {
-    const backendEntry = path.join(process.resourcesPath, 'backend', 'server.js')
-    // 在打包环境中，将上传目录固定到 exe 所在目录下的 uploads，便于绿色迁移
-    const appDir = path.dirname(app.getPath('exe'))
-    process.env.UPLOADS_ROOT = process.env.UPLOADS_ROOT || path.join(appDir, 'uploads')
-    // 数据库连接串保持与开发环境一致，必要时可在启动前通过环境变量覆盖
-    process.env.DATABASE_URL =
-      process.env.DATABASE_URL || 'postgres://postgres:aass0371@localhost:5432/cancerapp'
-    process.env.NODE_ENV = 'production'
-
-    // 动态导入后端 server（ESM）
-    const backendUrl = new URL(`file://${backendEntry.replace(/\\/g, '/')}`)
-    await import(backendUrl.href)
-    // server.ts 内部会自行监听端口，无需在此持有引用
-  } catch (error) {
-    // eslint-disable-next-line no-console
-    console.error('启动后端失败：', error)
+  if (isDev) {
+    devChild = await startOwnedChild(spawn, process.env.npm_node_execpath || 'node', path.join(__dirname, 'dev-server.cjs'), () => {
+      if (!quitting) {
+        for (const window of BrowserWindow.getAllWindows()) window.destroy()
+        dialog.showErrorBox('开发服务已停止', '本机开发服务进程已退出。')
+        app.quit()
+      }
+    })
+    return
   }
+  const origin = 'http://127.0.0.1:4000'
+  const pageRoot = path.join(app.getAppPath(), 'dist')
+  await fs.access(path.join(pageRoot, 'index.html'))
+  process.env.AUTH_ALLOWED_ORIGINS = origin
+  process.env.UPLOADS_ROOT = process.env.UPLOADS_ROOT || path.join(path.dirname(app.getPath('exe')), 'uploads')
+  process.env.NODE_ENV = 'production'
+  const { app: backend } = await import(pathToFileURL(path.join(process.resourcesPath, 'backend', 'dist', 'app.js')).href)
+  const express = (await import(pathToFileURL(path.join(process.resourcesPath, 'backend', 'node_modules', 'express', 'index.js')).href)).default
+  backend.use(express.static(pageRoot, { index: 'index.html', fallthrough: false }))
+  return listenOwned(backend, 4000, '127.0.0.1', error => {
+    console.error('本机服务错误')
+    dialog.showErrorBox('本机服务错误', '本机服务已停止。')
+    app.quit()
+  })
 }
 
 app.commandLine.appendSwitch('no-sandbox')
@@ -46,6 +56,12 @@ function createWindow() {
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
     },
+  })
+  win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
+  win.webContents.on('will-navigate', (event, url) => {
+    try {
+      if (new URL(url).origin !== 'http://127.0.0.1:4000') event.preventDefault()
+    } catch { event.preventDefault() }
   })
 
   // 允许 Ctrl/Cmd +/-/0 控制缩放，保持当前窗口内有效
@@ -73,17 +89,25 @@ function createWindow() {
     }
   })
 
-  if (isDev) {
-    win.loadURL('http://localhost:5173')
-    win.webContents.openDevTools({ mode: 'detach' })
-  } else {
-    win.loadFile(path.join(__dirname, '../dist/index.html'))
-  }
+  win.loadURL('http://127.0.0.1:4000').catch(() => {
+      dialog.showErrorBox('页面加载失败', '无法加载本机页面。')
+      app.quit()
+    })
+  if (isDev) win.webContents.openDevTools({ mode: 'detach' })
 }
 
 app.whenReady().then(async () => {
   Menu.setApplicationMenu(null)
-  await startBackend()
+  try {
+    await startBackend()
+  } catch (error) {
+    const known = ['端口 4000 已被占用', '开发服务启动超时', '无法启动开发服务进程', '开发服务进程提前退出', '开发服务启动失败，请检查依赖与运行环境']
+    const message = error?.code === 'EADDRINUSE' ? known[0] : known.includes(error?.message) ? error.message : '请检查本机资源和运行环境'
+    console.error('启动失败:', message)
+    dialog.showErrorBox('无法启动', `本机服务或页面启动失败：${message}`)
+    app.quit()
+    return
+  }
   createWindow()
 
   app.on('activate', () => {
@@ -91,6 +115,11 @@ app.whenReady().then(async () => {
       createWindow()
     }
   })
+})
+
+app.on('before-quit', () => {
+  quitting = true
+  if (devChild?.connected) devChild.disconnect()
 })
 
 ipcMain.handle('window:minimize', () => {
