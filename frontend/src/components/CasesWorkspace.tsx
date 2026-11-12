@@ -389,12 +389,12 @@ export const CasesWorkspace = ({
     : ''
 
   const handleMarkdownEditStart = useCallback(() => {
-    if (!selectedReport) return
+    if (!selectedReport || !selectedCase?.capabilities?.edit) return
     setMarkdownDraft(selectedReport.content)
     setIsMarkdownEditing(true)
     setMarkdownError(null)
     setMarkdownEditorHeight((current) => Math.max(current, 240))
-  }, [selectedReport])
+  }, [selectedReport, selectedCase])
 
   const handleMarkdownEditCancel = useCallback(() => {
     if (selectedReport) {
@@ -405,7 +405,7 @@ export const CasesWorkspace = ({
   }, [selectedReport])
 
   const handleMarkdownSave = useCallback(async () => {
-    if (!selectedCase || !selectedReport) {
+    if (!selectedCase?.capabilities?.edit || !selectedReport) {
       return
     }
     if (!markdownDraft.trim()) {
@@ -522,7 +522,7 @@ export const CasesWorkspace = ({
               <div className="case-viewer__controls">
                 {markdownError ? <span className="case-viewer__error">{markdownError}</span> : null}
                 <span className="case-viewer__tag-badge">Markdown</span>
-                {isMarkdownEditing ? (
+                {selectedCase?.capabilities?.edit && (isMarkdownEditing ? (
                   <>
                     <button type="button" className="case-viewer__reset" onClick={handleMarkdownSave} disabled={isMarkdownSaving}>
                       {isMarkdownSaving ? '保存中…' : '保存'}
@@ -535,7 +535,7 @@ export const CasesWorkspace = ({
                   <button type="button" className="case-viewer__reset" onClick={handleMarkdownEditStart}>
                     编辑
                   </button>
-                )}
+                ))}
               </div>
             </div>
             <div className="case-viewer__markdown-body" data-editing={isMarkdownEditing || undefined}>

@@ -1023,7 +1023,7 @@ export const AnalysisSidebar = ({
       <div className="case-panel__header">
         <h4 className="case-panel__title">图像</h4>
         <div className="case-panel__actions">
-          <button
+          {caseItem.capabilities?.upload && <button
             type="button"
             className="case-panel__action"
             disabled={isImporting}
@@ -1035,7 +1035,7 @@ export const AnalysisSidebar = ({
             }}
           >
             新增
-          </button>
+          </button>}
           <button
             type="button"
             className="case-panel__action case-panel__action--ghost"
@@ -1091,7 +1091,7 @@ export const AnalysisSidebar = ({
                     </span>
                   </button>
                   <div className="case-panel__media-actions">
-                    <button
+                    {caseItem.capabilities?.edit && <button
                       type="button"
                       className="case-panel__media-action"
                       onClick={(event) => {
@@ -1100,8 +1100,8 @@ export const AnalysisSidebar = ({
                       }}
                     >
                       编辑
-                    </button>
-                    <button
+                    </button>}
+                    {caseItem.capabilities?.delete && <button
                       type="button"
                       className="case-panel__media-action case-panel__media-action--danger"
                       onClick={(event) => {
@@ -1110,7 +1110,7 @@ export const AnalysisSidebar = ({
                       }}
                     >
                       删除
-                    </button>
+                    </button>}
                   </div>
                 </div>
               )
@@ -1134,7 +1134,7 @@ export const AnalysisSidebar = ({
       <div className="case-panel__header">
         <h4 className="case-panel__title">文字</h4>
         <div className="case-panel__actions">
-          <button
+          {caseItem.capabilities?.edit && <button
             type="button"
             className="case-panel__action"
             onClick={(event) => {
@@ -1143,7 +1143,7 @@ export const AnalysisSidebar = ({
             }}
           >
             新增
-          </button>
+          </button>}
           <button
             type="button"
             className="case-panel__action case-panel__action--ghost"
@@ -1190,7 +1190,7 @@ export const AnalysisSidebar = ({
                     <p className="report-item__summary">{report.summary ?? '—'}</p>
                   </button>
                   <div className="report-item__actions">
-                    <button
+                    {caseItem.capabilities?.edit && <button
                       type="button"
                       className="report-item__action"
                       onClick={(event) => {
@@ -1206,8 +1206,8 @@ export const AnalysisSidebar = ({
                       }}
                     >
                       编辑
-                    </button>
-                    <button
+                    </button>}
+                    {caseItem.capabilities?.delete && <button
                       type="button"
                       className="report-item__action report-item__action--danger"
                       onClick={(event) => {
@@ -1216,7 +1216,7 @@ export const AnalysisSidebar = ({
                       }}
                     >
                       删除
-                    </button>
+                    </button>}
                   </div>
                 </div>
               )
@@ -1616,7 +1616,7 @@ export const AnalysisSidebar = ({
                         ) : null}
                       </button>
                       <div className="case-card__actions-row case-card__actions-row--primary">
-                        <button
+                        {caseItem.capabilities?.edit && <button
                           type="button"
                           className="case-card__action"
                           onClick={(event) => {
@@ -1625,8 +1625,8 @@ export const AnalysisSidebar = ({
                           }}
                         >
                           编辑
-                        </button>
-                        <button
+                        </button>}
+                        {caseItem.capabilities?.delete && <button
                           type="button"
                           className="case-card__action case-card__action--danger"
                           onClick={(event) => {
@@ -1635,7 +1635,7 @@ export const AnalysisSidebar = ({
                           }}
                         >
                           删除
-                        </button>
+                        </button>}
                         <button
                           type="button"
                           className="case-card__action"

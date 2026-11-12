@@ -6,8 +6,27 @@ import type {
   Modality,
   TissueAnalysis,
 } from '../types/cases'
+import { AuthError } from './authService'
 
 const API_BASE_URL = window.location.origin === 'http://127.0.0.1:4000' ? window.location.origin : (import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:4000')
+
+export const caseRequest = async (url: string, init: RequestInit = {}) => {
+  const method = (init.method ?? 'GET').toUpperCase()
+  const headers = new Headers(init.headers)
+  if (!['GET', 'HEAD', 'OPTIONS'].includes(method)) {
+    const token = await fetch(`${API_BASE_URL}/auth/csrf/session`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: '{}' })
+    if (!token.ok) {
+      if (token.status === 401) window.dispatchEvent(new Event('cancerapp:unauthorized'))
+      if (token.status === 403) window.dispatchEvent(new Event('cancerapp:forbidden'))
+      throw new AuthError(token.status === 401 ? '登录状态已失效' : '获取安全令牌失败', token.status)
+    }
+    headers.set('X-CSRF-Token', ((await token.json()) as { token: string }).token)
+  }
+  const response = await fetch(url, { ...init, method, headers, credentials: 'include' })
+  if (response.status === 401) { window.dispatchEvent(new Event('cancerapp:unauthorized')); throw new AuthError('请先登录', 401) }
+  if (response.status === 403) { window.dispatchEvent(new Event('cancerapp:forbidden')); throw new AuthError('当前账户无权执行此操作', 403) }
+  return response
+}
 
 const mapReport = (report: any): CaseReport => ({
   id: report.id,
@@ -29,6 +48,7 @@ const mapCaseRecord = (data: any): CaseRecord => ({
   metadata: data.metadata ?? {},
   createdAt: data.created_at,
   updatedAt: data.updated_at,
+  capabilities: data.capabilities,
   samples:
     Array.isArray(data.samples)
       ? data.samples.map((sample: any) => ({
@@ -50,7 +70,7 @@ const mapCaseRecord = (data: any): CaseRecord => ({
 })
 
 export const fetchCases = async (): Promise<CaseRecord[]> => {
-  const response = await fetch(`${API_BASE_URL}/cases`)
+  const response = await caseRequest(`${API_BASE_URL}/cases`)
   if (!response.ok) {
     throw new Error('获取病例列表失败')
   }
@@ -84,7 +104,7 @@ export const createCase = async (payload: CaseCreatePayload): Promise<CaseRecord
     formData.append('textReports', JSON.stringify(payload.textReports))
   }
 
-  const response = await fetch(`${API_BASE_URL}/cases`, {
+  const response = await caseRequest(`${API_BASE_URL}/cases`, {
     method: 'POST',
     body: formData,
   })
@@ -99,8 +119,17 @@ export const createCase = async (payload: CaseCreatePayload): Promise<CaseRecord
   return mapCaseRecord(data)
 }
 
+export const appendCaseSamples = async (caseId: string, samples: CaseCreatePayload['samples']) => {
+  const form = new FormData()
+  form.append('samplesMeta', JSON.stringify(samples.map(({ displayName, modality }) => ({ displayName, modality }))))
+  samples.forEach((sample) => form.append('sampleFiles', sample.file, sample.file.name))
+  const response = await caseRequest(`${API_BASE_URL}/cases/${caseId}/samples`, { method: 'POST', body: form })
+  if (!response.ok) throw new Error((await response.json().catch(() => null))?.message ?? '追加样本失败')
+  return response.json()
+}
+
 const deleteRequest = async (url: string) => {
-  const response = await fetch(url, { method: 'DELETE' })
+  const response = await caseRequest(url, { method: 'DELETE' })
   if (!response.ok && response.status !== 204) {
     const errorBody = await response.json().catch(() => null)
     const message = errorBody?.message ?? '操作失败'
@@ -140,7 +169,7 @@ export const fetchSampleAnalysis = async (
   caseId: string,
   sampleId: string,
 ): Promise<TissueAnalysis | null> => {
-  const response = await fetch(`${API_BASE_URL}/cases/${caseId}/samples/${sampleId}/analysis`)
+  const response = await caseRequest(`${API_BASE_URL}/cases/${caseId}/samples/${sampleId}/analysis`)
   if (!response.ok) {
     if (response.status === 404) return null
     const errorBody = await response.json().catch(() => null)
@@ -156,7 +185,7 @@ export const deleteCaseReport = async (caseId: string, reportId: string): Promis
 }
 
 const jsonRequest = async <T>(url: string, init?: RequestInit): Promise<T> => {
-  const response = await fetch(url, {
+  const response = await caseRequest(url, {
     headers: {
       'Content-Type': 'application/json',
     },
@@ -197,7 +226,7 @@ export const updateCaseReport = async (
 }
 
 export const fetchCaseReports = async (caseId: string): Promise<CaseReport[]> => {
-  const response = await fetch(`${API_BASE_URL}/cases/${caseId}/reports`)
+  const response = await caseRequest(`${API_BASE_URL}/cases/${caseId}/reports`)
   if (!response.ok) {
     const errorBody = await response.json().catch(() => null)
     const message = errorBody?.message ?? '获取文字病历失败'

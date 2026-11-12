@@ -7,6 +7,7 @@ import { CasesWorkspace } from './components/CasesWorkspace'
 import type { CaseCreateSample, CaseRecord, CaseReportDraft, Modality } from './types/cases'
 import {
   fetchCases,
+  appendCaseSamples,
   createCase,
   deleteCase,
   deleteCaseSample,
@@ -216,6 +217,15 @@ function App() {
     }) => {
       setImportingCase(true)
       try {
+        const existing = cases.find((item) => item.identifier === identifier)
+        if (existing) {
+          if (samples.length) await appendCaseSamples(existing.id, samples)
+          for (const report of textReports) await createCaseReport(existing.id, report)
+          const refreshed = await fetchCases()
+          setCases(refreshed)
+          setSelectedCaseId(existing.id)
+          return
+        }
         const created = await createCase({ identifier, samples, textReports })
         setCases((prev) => {
           const existingIndex = prev.findIndex((item) => item.id === created.id)
@@ -246,7 +256,7 @@ function App() {
         setImportingCase(false)
       }
     },
-    [],
+    [cases],
   )
 
   const handleDeleteCase = useCallback(

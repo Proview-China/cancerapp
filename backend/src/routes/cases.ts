@@ -1,4 +1,5 @@
 import { Router } from 'express'
+import type { Request, Response, NextFunction } from 'express'
 import multer from 'multer'
 import crypto from 'node:crypto'
 import { pool } from '../db/pool.js'
@@ -9,6 +10,11 @@ import {
   ensureSampleTissueAnalysisTable,
 } from '../db/init.js'
 import { storeFile, deleteStoredFile } from '../utils/fileStorage.js'
+import { authenticateRequest } from '../auth/middleware.js'
+import { validateCsrf } from '../auth/csrf.js'
+import { CaseAccessError, canAccessCase, effectiveCaseCapabilities, grantCasePermission, recordCaseAudit, revokeCasePermission, visibleCasesSql, withAuthorizedCaseMutation } from '../auth/caseAccess.js'
+import type { CasePermission } from '../auth/caseAccess.js'
+import type { SessionContext } from '../auth/types.js'
 import type {
   CaseReportRecord,
   CaseSampleRecord,
@@ -28,6 +34,57 @@ const upload = multer({
 })
 
 const casesRouter = Router()
+
+const caseApiGuard = async (req: Request, res: Response, next: NextFunction) => {
+  await authenticateRequest(req, res, () => {
+    const user = res.locals.auth as SessionContext | undefined
+    if (!user) return
+    const allowedOrigins = req.app.locals.allowedOrigins as Set<string>
+    const origin = req.get('origin')
+    if (!origin || origin === 'null' || !allowedOrigins.has(origin)) {
+      res.status(403).json({ message: '来源不受信任' })
+      return
+    }
+    if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method) && !validateCsrf(req, user.sessionId)) {
+      res.status(403).json({ message: '安全令牌无效或已过期' })
+      return
+    }
+    next()
+  })
+}
+casesRouter.use(caseApiGuard)
+
+const currentUser = (res: Response) => res.locals.auth as SessionContext
+
+const requireCaseCapability = async (req: Request, res: Response, permission: 'read' | 'edit' | 'upload') => {
+  const client = await pool.connect()
+  try {
+    await client.query('BEGIN')
+    await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 1))', [`case-access:${req.params.caseId}`])
+    const capability = await canAccessCase(currentUser(res), req.params.caseId, permission, client)
+    if (!capability) { await client.query('ROLLBACK'); res.status(404).json({ message: '病例不存在或无权访问' }); return false }
+    res.locals.caseCapabilities = capability
+    await client.query('COMMIT')
+    return true
+  } catch (error) { await client.query('ROLLBACK').catch(() => undefined); throw error }
+  finally { client.release() }
+}
+
+const withAdminCaseMutation = async <T>(user: SessionContext, caseId: string, operation: (client: import('pg').PoolClient) => Promise<T>) =>
+  withAuthorizedCaseMutation(user, caseId, 'edit', operation)
+
+const mapAccessError = (error: unknown) => error instanceof CaseAccessError ? new HttpError(404, '病例不存在或无权访问') : error
+
+const capabilitiesForCase = async (user: SessionContext, caseId: string, ownerId: string | null) => {
+  if (user.role === 'admin' || user.role === 'researcher' || !ownerId) return effectiveCaseCapabilities(user, ownerId, [])
+  const result = await pool.query('SELECT permission FROM case_access_grants WHERE case_id=$1 AND user_id=$2 AND revoked_at IS NULL', [caseId, user.id])
+  return effectiveCaseCapabilities(user, ownerId, result.rows.map((row) => row.permission as CasePermission))
+}
+
+const canCreateClinicalCase = (res: Response) => {
+  const user = currentUser(res)
+  return user.role === 'admin' || user.role === 'pathologist'
+}
 
 const MAX_REPORT_TITLE_LENGTH = 200
 const MAX_REPORT_SUMMARY_LENGTH = 1000
@@ -292,7 +349,7 @@ const fetchRowsByCaseIds = async (table: 'case_samples' | 'case_reports', ids: s
   return result.rows
 }
 
-const fetchCaseWithRelations = async (caseId: string): Promise<CaseWithRelations | null> => {
+const fetchCaseWithRelations = async (caseId: string, user: SessionContext): Promise<CaseWithRelations | null> => {
   await Promise.all([ensureCaseSamplesSortOrder(), ensureCaseReportsSortOrder(), ensureSampleTissueAnalysisTable()])
 
   const caseResult = await pool.query('SELECT * FROM cases WHERE id = $1', [caseId])
@@ -366,6 +423,7 @@ const fetchCaseWithRelations = async (caseId: string): Promise<CaseWithRelations
     updated_at: row.updated_at,
     samples,
     reports: mapReports(reportsResult.rows),
+    capabilities: await capabilitiesForCase(user, caseId, row.owner_user_id),
   }
 }
 
@@ -377,7 +435,8 @@ casesRouter.get('/', async (_req, res) => {
       ensureCaseReportsSortOrder(),
       ensureSampleTissueAnalysisTable(),
     ])
-    const casesResult = await pool.query('SELECT * FROM cases ORDER BY created_at DESC')
+    const visible = visibleCasesSql(currentUser(res))
+    const casesResult = await pool.query(`SELECT c.* FROM cases c WHERE ${visible.sql} ORDER BY c.created_at DESC`, visible.values)
     const caseRows = casesResult.rows
 
     if (caseRows.length === 0) {
@@ -386,6 +445,9 @@ casesRouter.get('/', async (_req, res) => {
     }
 
     const ids = caseRows.map((row) => row.id)
+    const grantsResult = ['admin', 'researcher'].includes(currentUser(res).role) ? { rows: [] } : await pool.query("SELECT case_id, permission FROM case_access_grants WHERE user_id=$1 AND revoked_at IS NULL", [currentUser(res).id])
+    const grantsByCase = new Map<string, CasePermission[]>()
+    for (const grant of grantsResult.rows) grantsByCase.set(grant.case_id, [...(grantsByCase.get(grant.case_id) ?? []), grant.permission])
     const [samplesResult, reportsResult] = await Promise.all([
       fetchRowsByCaseIds('case_samples', ids),
       fetchRowsByCaseIds('case_reports', ids),
@@ -461,6 +523,7 @@ casesRouter.get('/', async (_req, res) => {
       updated_at: row.updated_at,
       samples: samplesMap.get(row.id) ?? [],
       reports: reportsMap.get(row.id) ?? [],
+      capabilities: effectiveCaseCapabilities(currentUser(res), row.owner_user_id, grantsByCase.get(row.id) ?? []),
     }))
 
     res.json(data)
@@ -471,6 +534,7 @@ casesRouter.get('/', async (_req, res) => {
 })
 
 casesRouter.post('/', upload.array('sampleFiles'), async (req, res) => {
+  if (!canCreateClinicalCase(res)) { res.status(403).json({ message: '无权创建病例' }); return }
   const identifier = typeof req.body.identifier === 'string' ? req.body.identifier.trim() : ''
   const displayName = typeof req.body.displayName === 'string' ? req.body.displayName.trim() : null
   const notes = typeof req.body.notes === 'string' ? req.body.notes.trim() : null
@@ -532,13 +596,13 @@ casesRouter.post('/', upload.array('sampleFiles'), async (req, res) => {
     await client.query('BEGIN')
 
     const caseResult = await client.query(
-      `INSERT INTO cases (identifier, display_name, notes)
-       VALUES ($1, $2, $3)
-       ON CONFLICT (identifier)
-       DO UPDATE SET updated_at = NOW(), display_name = COALESCE($2, cases.display_name), notes = COALESCE($3, cases.notes)
+      `INSERT INTO cases (identifier, display_name, notes, owner_user_id)
+       VALUES ($1, $2, $3, $4)
        RETURNING *`,
-      [identifier, displayName, notes],
+      [identifier, displayName, notes, currentUser(res).id],
     )
+
+    if (caseResult.rowCount === 0) throw new HttpError(409, '病例编号已存在')
 
     const caseRow = caseResult.rows[0]
 
@@ -613,6 +677,8 @@ casesRouter.post('/', upload.array('sampleFiles'), async (req, res) => {
       }
     }
 
+    await recordCaseAudit(client, currentUser(res), caseRow.id, caseRow.identifier, 'case.create')
+
     await client.query('COMMIT')
 
     const [samplesResult, reportsResult] = await Promise.all([
@@ -636,11 +702,16 @@ casesRouter.post('/', upload.array('sampleFiles'), async (req, res) => {
       updated_at: caseRow.updated_at,
       samples: mapSamples(samplesResult.rows),
       reports: mapReports(reportsResult.rows),
+      capabilities: await capabilitiesForCase(currentUser(res), caseRow.id, caseRow.owner_user_id),
     }
 
     res.status(201).json(response)
   } catch (error) {
     await client.query('ROLLBACK')
+    if ((error as { code?: string })?.code === '23505') {
+      res.status(409).json({ message: '病例编号已存在' })
+      return
+    }
     if (error instanceof HttpError) {
       res.status(error.status).json({ message: error.message })
       return
@@ -652,80 +723,122 @@ casesRouter.post('/', upload.array('sampleFiles'), async (req, res) => {
   }
 })
 
+casesRouter.post('/:caseId/samples', upload.array('sampleFiles'), async (req, res) => {
+  const { caseId } = req.params
+  const files = (req.files as Express.Multer.File[]) ?? []
+  let metas: Array<{ displayName: string; modality: Modality }>
+  try {
+    const raw = typeof req.body.samplesMeta === 'string' ? JSON.parse(req.body.samplesMeta) : []
+    metas = raw.map((item: Record<string, unknown>) => ({ displayName: typeof item.displayName === 'string' ? item.displayName.trim() : '', modality: item.modality as Modality }))
+  } catch { res.status(400).json({ message: '样例元数据格式错误' }); return }
+  if (!files.length || metas.length !== files.length || metas.some((item) => !allowedModalities.includes(item.modality))) { res.status(400).json({ message: '样例文件或元数据无效' }); return }
+  const ownedFiles: string[] = []
+  try {
+    const result = await withAuthorizedCaseMutation(currentUser(res), caseId, 'upload', async (client) => {
+      const caseRow = await client.query('SELECT identifier FROM cases WHERE id=$1 FOR UPDATE', [caseId])
+      if (!caseRow.rowCount) throw new HttpError(404, '病例不存在或无权访问')
+      const count = await client.query('SELECT COUNT(*)::int AS count FROM case_samples WHERE case_id=$1', [caseId])
+      const order = await client.query('SELECT COALESCE(MAX(sort_order),0)::int AS n FROM case_samples WHERE case_id=$1', [caseId])
+      const rows = []
+      for (let i = 0; i < files.length; i++) {
+        const stored = await storeFile(files[i]); ownedFiles.push(stored.publicPath)
+        const inserted = await client.query(`INSERT INTO case_samples(case_id,modality,description,original_filename,storage_path,storage_thumbnail,checksum,sort_order)
+          VALUES($1,$2,$3,$4,$5,$5,$6,$7) RETURNING *`, [caseId, metas[i].modality, metas[i].displayName || null, stored.publicPath.split('/').pop(), stored.publicPath, crypto.createHash('sha256').update(files[i].buffer).digest('hex'), Number(order.rows[0].n) + i + 1])
+        rows.push(inserted.rows[0])
+      }
+      await recordCaseAudit(client, currentUser(res), caseId, caseRow.rows[0].identifier, 'sample.append')
+      return { rows, previousSampleCount: Number(count.rows[0].count) }
+    })
+    res.status(201).json({ samples: mapSamples(result.rows), previousSampleCount: result.previousSampleCount })
+  } catch (error) {
+    await Promise.all(ownedFiles.map((file) => deleteStoredFile(file)))
+    const mapped = mapAccessError(error)
+    if (mapped instanceof HttpError) { res.status(mapped.status).json({ message: mapped.message }); return }
+    console.error('追加病例样本失败', error); res.status(500).json({ message: '追加病例样本失败' })
+  }
+})
+
+casesRouter.post('/:caseId/access-grants', async (req, res) => {
+  if (currentUser(res).role !== 'admin') { res.status(403).json({ message: '无权管理病例授权' }); return }
+  const { userId, permission } = req.body ?? {}
+  if (typeof userId !== 'string' || !['read', 'edit', 'upload'].includes(permission)) { res.status(400).json({ message: '授权参数无效' }); return }
+  try { await grantCasePermission(currentUser(res), req.params.caseId, userId, permission); res.status(204).send() }
+  catch (error) { console.error('病例授权失败', { name: (error as Error)?.name, code: (error as { code?: string })?.code }); res.status((error as Error).message === 'not-found' ? 404 : 400).json({ message: '无法授予病例权限' }) }
+})
+
+casesRouter.delete('/:caseId/access-grants/:userId/:permission', async (req, res) => {
+  if (currentUser(res).role !== 'admin') { res.status(403).json({ message: '无权管理病例授权' }); return }
+  const { userId, permission } = req.params
+  if (!['read', 'edit', 'upload'].includes(permission)) { res.status(400).json({ message: '授权参数无效' }); return }
+  try { await revokeCasePermission(currentUser(res), req.params.caseId, userId, permission as 'read' | 'edit' | 'upload'); res.status(204).send() }
+  catch { res.status(404).json({ message: '病例不存在或无权访问' }) }
+})
+
 casesRouter.delete('/:caseId', async (req, res) => {
   const { caseId } = req.params
-
-  const client = await pool.connect()
+  if (currentUser(res).role !== 'admin') { res.status(403).json({ message: '无权删除病例' }); return }
 
   try {
-    await client.query('BEGIN')
-
-    const samplesResult = await client.query(
-      'SELECT storage_path FROM case_samples WHERE case_id = $1',
-      [caseId],
-    )
-
-    const deleteResult = await client.query('DELETE FROM cases WHERE id = $1 RETURNING id', [caseId])
-
-    await client.query('COMMIT')
-
-    if (deleteResult.rowCount === 0) {
-      res.status(404).json({ message: '病例不存在' })
-      return
-    }
-
-    await Promise.all(samplesResult.rows.map((row) => deleteStoredFile(row.storage_path as string)))
+    const samplesResult = await withAdminCaseMutation(currentUser(res), caseId, async (client) => {
+      const samples = await client.query('SELECT storage_path FROM case_samples WHERE case_id=$1', [caseId])
+      const row = await client.query('SELECT identifier FROM cases WHERE id=$1 FOR UPDATE', [caseId])
+      if (!row.rowCount) throw new HttpError(404, '病例不存在或无权访问')
+      await recordCaseAudit(client, currentUser(res), caseId, row.rows[0].identifier, 'case.delete')
+      await client.query('DELETE FROM cases WHERE id=$1', [caseId])
+      return samples.rows
+    })
+    await Promise.all(samplesResult.map((row) => deleteStoredFile(row.storage_path as string)))
 
     res.status(204).send()
   } catch (error) {
-    await client.query('ROLLBACK')
+    const mapped = mapAccessError(error)
+    if (mapped instanceof HttpError) { res.status(mapped.status).json({ message: mapped.message }); return }
     console.error('删除病例失败', error)
     res.status(500).json({ message: '删除病例失败' })
-  } finally {
-    client.release()
   }
 })
 
 casesRouter.patch('/:caseId/samples/:sampleId', async (req, res) => {
   const { caseId, sampleId } = req.params
-
   try {
-    await assertCaseExists(caseId)
-    const existing = await pool.query('SELECT id FROM case_samples WHERE id = $1 AND case_id = $2', [sampleId, caseId])
-    if (existing.rowCount === 0) {
-      throw new HttpError(404, '影像样例不存在')
-    }
+    await withAuthorizedCaseMutation(currentUser(res), caseId, 'edit', async (client) => {
+      const existing = await client.query('SELECT id FROM case_samples WHERE id = $1 AND case_id = $2 FOR UPDATE', [sampleId, caseId])
+      if (existing.rowCount === 0) {
+        throw new HttpError(404, '影像样例不存在')
+      }
 
-    const payload = normalizeSampleForPatch(req.body)
-    const assignments: string[] = []
-    const values: unknown[] = []
+      const payload = normalizeSampleForPatch(req.body)
+      const assignments: string[] = []
+      const values: unknown[] = []
 
-    if (Object.prototype.hasOwnProperty.call(payload, 'description')) {
-      assignments.push(`description = $${assignments.length + 1}`)
-      values.push(payload.description)
-    }
+      if (Object.prototype.hasOwnProperty.call(payload, 'description')) {
+        assignments.push(`description = $${assignments.length + 1}`)
+        values.push(payload.description)
+      }
 
-    if (Object.prototype.hasOwnProperty.call(payload, 'modality')) {
-      assignments.push(`modality = $${assignments.length + 1}`)
-      values.push(payload.modality)
-    }
+      if (Object.prototype.hasOwnProperty.call(payload, 'modality')) {
+        assignments.push(`modality = $${assignments.length + 1}`)
+        values.push(payload.modality)
+      }
 
-    assignments.push('updated_at = NOW()')
-    values.push(caseId, sampleId)
+      assignments.push('updated_at = NOW()')
+      values.push(caseId, sampleId)
 
-    const caseIndex = values.length - 1
-    const sampleIndex = values.length
+      const caseIndex = values.length - 1
+      const sampleIndex = values.length
 
-    const updateSql = `UPDATE case_samples SET ${assignments.join(', ')} WHERE case_id = $${caseIndex} AND id = $${sampleIndex}`
-    await pool.query(updateSql, values)
+      const updateSql = `UPDATE case_samples SET ${assignments.join(', ')} WHERE case_id = $${caseIndex} AND id = $${sampleIndex}`
+      await client.query(updateSql, values)
+    })
 
-    const updated = await fetchCaseWithRelations(caseId)
+    const updated = await fetchCaseWithRelations(caseId, currentUser(res))
     if (!updated) {
       throw new HttpError(500, '更新影像样例失败')
     }
 
     res.json(updated)
   } catch (error) {
+    error = mapAccessError(error)
     if (error instanceof HttpError) {
       res.status(error.status).json({ message: error.message })
       return
@@ -737,36 +850,26 @@ casesRouter.patch('/:caseId/samples/:sampleId', async (req, res) => {
 
 casesRouter.delete('/:caseId/samples/:sampleId', async (req, res) => {
   const { caseId, sampleId } = req.params
-
-  const client = await pool.connect()
+  if (currentUser(res).role !== 'admin') { res.status(403).json({ message: '无权删除样例' }); return }
 
   try {
-    await client.query('BEGIN')
+    const storedPath = await withAdminCaseMutation(currentUser(res), caseId, async (client) => {
+      const sample = await client.query('SELECT storage_path FROM case_samples WHERE id=$1 AND case_id=$2 FOR UPDATE', [sampleId, caseId])
+      if (!sample.rowCount) throw new HttpError(404, '病例不存在或无权访问')
+      const parent = await client.query('SELECT identifier FROM cases WHERE id=$1', [caseId])
+      await recordCaseAudit(client, currentUser(res), caseId, parent.rows[0].identifier, 'sample.delete')
+      await client.query('DELETE FROM case_samples WHERE id=$1 AND case_id=$2', [sampleId, caseId])
+      return sample.rows[0].storage_path as string
+    })
 
-    const sampleResult = await client.query(
-      'SELECT storage_path FROM case_samples WHERE id = $1 AND case_id = $2',
-      [sampleId, caseId],
-    )
-
-    if (sampleResult.rowCount === 0) {
-      await client.query('ROLLBACK')
-      res.status(404).json({ message: '样例不存在' })
-      return
-    }
-
-    await client.query('DELETE FROM case_samples WHERE id = $1 AND case_id = $2', [sampleId, caseId])
-
-    await client.query('COMMIT')
-
-    await deleteStoredFile(sampleResult.rows[0].storage_path as string)
+    await deleteStoredFile(storedPath)
 
     res.status(204).send()
   } catch (error) {
-    await client.query('ROLLBACK')
+    const mapped = mapAccessError(error)
+    if (mapped instanceof HttpError) { res.status(mapped.status).json({ message: mapped.message }); return }
     console.error('删除样例失败', error)
     res.status(500).json({ message: '删除样例失败' })
-  } finally {
-    client.release()
   }
 })
 
@@ -776,11 +879,12 @@ casesRouter.patch('/:caseId', async (req, res) => {
 
   try {
     await ensureCaseReportsTable()
-    await assertCaseExists(caseId)
+    await withAuthorizedCaseMutation(currentUser(res), caseId, 'edit', async (client) => {
 
-    const normalizedName = parseNonEmptyString(displayName, 'displayName', 120)
-    await pool.query('UPDATE cases SET display_name = $1, updated_at = NOW() WHERE id = $2', [normalizedName, caseId])
-    const updated = await fetchCaseWithRelations(caseId)
+      const normalizedName = parseNonEmptyString(displayName, 'displayName', 120)
+      await client.query('UPDATE cases SET display_name = $1, updated_at = NOW() WHERE id = $2', [normalizedName, caseId])
+    })
+    const updated = await fetchCaseWithRelations(caseId, currentUser(res))
 
     if (!updated) {
       res.status(404).json({ message: '病例不存在' })
@@ -789,6 +893,7 @@ casesRouter.patch('/:caseId', async (req, res) => {
 
     res.json(updated)
   } catch (error) {
+    error = mapAccessError(error)
     if (error instanceof HttpError) {
       res.status(error.status).json({ message: error.message })
       return
@@ -801,6 +906,7 @@ casesRouter.patch('/:caseId', async (req, res) => {
 // GET /cases/:caseId/samples/:sampleId/analysis
 casesRouter.get('/:caseId/samples/:sampleId/analysis', async (req, res) => {
   const { caseId, sampleId } = req.params
+  if (!await requireCaseCapability(req, res, 'read')) return
   try {
     await ensureSampleTissueAnalysisTable()
 
@@ -857,6 +963,7 @@ casesRouter.get('/:caseId/samples/:sampleId/analysis', async (req, res) => {
 casesRouter.get('/:caseId/reports', async (req, res) => {
   const { caseId } = req.params
   try {
+    if (!await requireCaseCapability(req, res, 'read')) return
     await Promise.all([ensureCaseReportsTable(), ensureCaseReportsSortOrder()])
     await assertCaseExists(caseId)
     const reportsResult = await pool.query(
@@ -879,22 +986,18 @@ casesRouter.post('/:caseId/reports', async (req, res) => {
   try {
     await Promise.all([ensureCaseReportsTable(), ensureCaseReportsSortOrder()])
     const payload = normalizeReportForInsert(req.body)
-    await assertCaseExists(caseId)
-    const orderResult = await pool.query(
-      'SELECT COALESCE(MAX(sort_order), 0) AS max_order FROM case_reports WHERE case_id = $1',
-      [caseId],
-    )
-    const nextOrder = Number(orderResult.rows[0]?.max_order ?? 0) + 1
-    const insertResult = await pool.query(
-      `INSERT INTO case_reports (case_id, title, summary, content, tags, metadata, sort_order)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
-       RETURNING *`,
-      [caseId, payload.title, payload.summary, payload.content, payload.tags, payload.metadata, nextOrder],
-    )
-    res.status(201).json(mapReports(insertResult.rows)[0])
+    const inserted = await withAuthorizedCaseMutation(currentUser(res), caseId, 'edit', async (client) => {
+        const orderResult = await client.query('SELECT COALESCE(MAX(sort_order),0) AS max_order FROM case_reports WHERE case_id=$1', [caseId])
+        const nextOrder = Number(orderResult.rows[0]?.max_order ?? 0) + 1
+        const result = await client.query(`INSERT INTO case_reports(case_id,title,summary,content,tags,metadata,sort_order)
+          VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING *`, [caseId, payload.title, payload.summary, payload.content, payload.tags, payload.metadata, nextOrder])
+        return result.rows[0]
+    })
+    res.status(201).json(mapReports([inserted])[0])
   } catch (error) {
-    if (error instanceof HttpError) {
-      res.status(error.status).json({ message: error.message })
+    const mapped = mapAccessError(error)
+    if (mapped instanceof HttpError) {
+      res.status(mapped.status).json({ message: mapped.message })
       return
     }
     console.error('新增文字病历失败', error)
@@ -905,47 +1008,52 @@ casesRouter.post('/:caseId/reports', async (req, res) => {
 casesRouter.patch('/:caseId/reports/:reportId', async (req, res) => {
   const { caseId, reportId } = req.params
   try {
-    await ensureCaseReportsTable()
-    await assertCaseExists(caseId)
-    const payload = normalizeReportForPatch(req.body)
-    const setFragments: string[] = []
-    const values: unknown[] = []
+    const mutationResult = await withAuthorizedCaseMutation(currentUser(res), caseId, 'edit', async (client) => {
+      await ensureCaseReportsTable()
+      const belongs = await client.query('SELECT 1 FROM case_reports WHERE id=$1 AND case_id=$2 FOR UPDATE', [reportId, caseId])
+      if (!belongs.rowCount) throw new HttpError(404, '病例不存在或无权访问')
+      const payload = normalizeReportForPatch(req.body)
+      const setFragments: string[] = []
+      const values: unknown[] = []
 
-    if (payload.title !== undefined) {
-      values.push(payload.title)
-      setFragments.push(`title = $${values.length}`)
-    }
-    if (payload.summary !== undefined) {
-      values.push(payload.summary)
-      setFragments.push(`summary = $${values.length}`)
-    }
-    if (payload.content !== undefined) {
-      values.push(payload.content)
-      setFragments.push(`content = $${values.length}`)
-    }
-    if (payload.tags !== undefined) {
-      values.push(payload.tags)
-      setFragments.push(`tags = $${values.length}`)
-    }
-    if (payload.metadata !== undefined) {
-      values.push(payload.metadata)
-      setFragments.push(`metadata = $${values.length}`)
-    }
+      if (payload.title !== undefined) {
+        values.push(payload.title)
+        setFragments.push(`title = $${values.length}`)
+      }
+      if (payload.summary !== undefined) {
+        values.push(payload.summary)
+        setFragments.push(`summary = $${values.length}`)
+      }
+      if (payload.content !== undefined) {
+        values.push(payload.content)
+        setFragments.push(`content = $${values.length}`)
+      }
+      if (payload.tags !== undefined) {
+        values.push(payload.tags)
+        setFragments.push(`tags = $${values.length}`)
+      }
+      if (payload.metadata !== undefined) {
+        values.push(payload.metadata)
+        setFragments.push(`metadata = $${values.length}`)
+      }
 
-    const reportIdIndex = values.length + 1
-    const caseIdIndex = values.length + 2
-    const updateQuery = `UPDATE case_reports SET ${setFragments.join(', ')}, updated_at = NOW()
-      WHERE id = $${reportIdIndex} AND case_id = $${caseIdIndex}
-      RETURNING *`
-    values.push(reportId, caseId)
+      const reportIdIndex = values.length + 1
+      const caseIdIndex = values.length + 2
+      const updateQuery = `UPDATE case_reports SET ${setFragments.join(', ')}, updated_at = NOW()
+        WHERE id = $${reportIdIndex} AND case_id = $${caseIdIndex}
+        RETURNING *`
+      values.push(reportId, caseId)
 
-    const updateResult = await pool.query(updateQuery, values)
-    if (updateResult.rowCount === 0) {
-      throw new HttpError(404, '文字病历不存在')
-    }
+      const updateResult = await client.query(updateQuery, values)
+      if (updateResult.rowCount === 0) {
+        throw new HttpError(404, '文字病历不存在')
+      }
 
-    res.json(mapReports(updateResult.rows)[0])
+      return updateResult.rows
+    })
+    res.json(mapReports(mutationResult)[0])
   } catch (error) {
+    error = mapAccessError(error)
     if (error instanceof HttpError) {
       res.status(error.status).json({ message: error.message })
       return
@@ -960,25 +1068,25 @@ casesRouter.put('/:caseId/samples/order', async (req, res) => {
   const { ids } = (req.body ?? {}) as { ids?: unknown }
 
   try {
-    await ensureCaseSamplesSortOrder()
-    await assertCaseExists(caseId)
+    await withAuthorizedCaseMutation(currentUser(res), caseId, 'edit', async (client) => {
+      await ensureCaseSamplesSortOrder()
 
-    if (!Array.isArray(ids) || ids.length === 0) {
-      throw new HttpError(400, 'ids 必须是非空数组')
-    }
+      if (!Array.isArray(ids) || ids.length === 0) {
+        throw new HttpError(400, 'ids 必须是非空数组')
+      }
 
-    const orderedIds = ids.map((id, index) => {
-      if (typeof id !== 'string') {
-        throw new HttpError(400, `第 ${index + 1} 项 id 必须是字符串`)
-      }
-      const trimmed = id.trim()
-      if (!trimmed) {
-        throw new HttpError(400, `第 ${index + 1} 项 id 不能为空`)
-      }
-      return trimmed
+      const orderedIds = ids.map((id, index) => {
+        if (typeof id !== 'string') {
+          throw new HttpError(400, `第 ${index + 1} 项 id 必须是字符串`)
+        }
+        const trimmed = id.trim()
+        if (!trimmed) {
+          throw new HttpError(400, `第 ${index + 1} 项 id 不能为空`)
+        }
+        return trimmed
     })
 
-    const existingResult = await pool.query('SELECT id FROM case_samples WHERE case_id = $1', [caseId])
+    const existingResult = await client.query('SELECT id FROM case_samples WHERE case_id = $1', [caseId])
     const existingIds = existingResult.rows.map((row) => String(row.id))
 
     if (existingIds.length !== orderedIds.length) {
@@ -998,26 +1106,15 @@ casesRouter.put('/:caseId/samples/order', async (req, res) => {
       }
     }
 
-    const client = await pool.connect()
-    try {
-      await client.query('BEGIN')
-      for (let index = 0; index < orderedIds.length; index += 1) {
-        const sortOrder = index + 1
-        await client.query(
-          'UPDATE case_samples SET sort_order = $1, updated_at = NOW() WHERE id = $2 AND case_id = $3',
-          [sortOrder, orderedIds[index], caseId],
-        )
-      }
-      await client.query('COMMIT')
-    } catch (error) {
-      await client.query('ROLLBACK')
-      throw error
-    } finally {
-      client.release()
+    for (let index = 0; index < orderedIds.length; index += 1) {
+      const sortOrder = index + 1
+      await client.query('UPDATE case_samples SET sort_order = $1, updated_at = NOW() WHERE id = $2 AND case_id = $3', [sortOrder, orderedIds[index], caseId])
     }
+    })
 
     res.status(204).send()
   } catch (error) {
+    error = mapAccessError(error)
     if (error instanceof HttpError) {
       res.status(error.status).json({ message: error.message })
       return
@@ -1032,25 +1129,25 @@ casesRouter.put('/:caseId/reports/order', async (req, res) => {
   const { ids } = (req.body ?? {}) as { ids?: unknown }
 
   try {
-    await ensureCaseReportsSortOrder()
-    await assertCaseExists(caseId)
+    await withAuthorizedCaseMutation(currentUser(res), caseId, 'edit', async (client) => {
+      await ensureCaseReportsSortOrder()
 
-    if (!Array.isArray(ids) || ids.length === 0) {
-      throw new HttpError(400, 'ids 必须是非空数组')
-    }
+      if (!Array.isArray(ids) || ids.length === 0) {
+        throw new HttpError(400, 'ids 必须是非空数组')
+      }
 
-    const orderedIds = ids.map((id, index) => {
-      if (typeof id !== 'string') {
-        throw new HttpError(400, `第 ${index + 1} 项 id 必须是字符串`)
-      }
-      const trimmed = id.trim()
-      if (!trimmed) {
-        throw new HttpError(400, `第 ${index + 1} 项 id 不能为空`)
-      }
-      return trimmed
+      const orderedIds = ids.map((id, index) => {
+        if (typeof id !== 'string') {
+          throw new HttpError(400, `第 ${index + 1} 项 id 必须是字符串`)
+        }
+        const trimmed = id.trim()
+        if (!trimmed) {
+          throw new HttpError(400, `第 ${index + 1} 项 id 不能为空`)
+        }
+        return trimmed
     })
 
-    const existingResult = await pool.query('SELECT id FROM case_reports WHERE case_id = $1', [caseId])
+    const existingResult = await client.query('SELECT id FROM case_reports WHERE case_id = $1', [caseId])
     const existingIds = existingResult.rows.map((row) => String(row.id))
 
     if (existingIds.length !== orderedIds.length) {
@@ -1070,26 +1167,15 @@ casesRouter.put('/:caseId/reports/order', async (req, res) => {
       }
     }
 
-    const client = await pool.connect()
-    try {
-      await client.query('BEGIN')
-      for (let index = 0; index < orderedIds.length; index += 1) {
-        const sortOrder = index + 1
-        await client.query(
-          'UPDATE case_reports SET sort_order = $1, updated_at = NOW() WHERE id = $2 AND case_id = $3',
-          [sortOrder, orderedIds[index], caseId],
-        )
-      }
-      await client.query('COMMIT')
-    } catch (error) {
-      await client.query('ROLLBACK')
-      throw error
-    } finally {
-      client.release()
+    for (let index = 0; index < orderedIds.length; index += 1) {
+      const sortOrder = index + 1
+      await client.query('UPDATE case_reports SET sort_order = $1, updated_at = NOW() WHERE id = $2 AND case_id = $3', [sortOrder, orderedIds[index], caseId])
     }
+    })
 
     res.status(204).send()
   } catch (error) {
+    error = mapAccessError(error)
     if (error instanceof HttpError) {
       res.status(error.status).json({ message: error.message })
       return
@@ -1102,14 +1188,21 @@ casesRouter.put('/:caseId/reports/order', async (req, res) => {
 casesRouter.delete('/:caseId/reports/:reportId', async (req, res) => {
   const { caseId, reportId } = req.params
   try {
+    if (currentUser(res).role !== 'admin') { res.status(403).json({ message: '无权删除文字病历' }); return }
     await ensureCaseReportsTable()
-    await assertCaseExists(caseId)
-    await fetchReportRow(caseId, reportId)
-    await pool.query('DELETE FROM case_reports WHERE id = $1 AND case_id = $2', [reportId, caseId])
+    await withAdminCaseMutation(currentUser(res), caseId, async (client) => {
+      const parent = await client.query('SELECT identifier FROM cases WHERE id=$1 FOR UPDATE', [caseId])
+      if (!parent.rowCount) throw new HttpError(404, '病例不存在或无权访问')
+      const exists = await client.query('SELECT 1 FROM case_reports WHERE id=$1 AND case_id=$2 FOR UPDATE', [reportId, caseId])
+      if (!exists.rowCount) throw new HttpError(404, '病例不存在或无权访问')
+      await recordCaseAudit(client, currentUser(res), caseId, parent.rows[0].identifier, 'report.delete')
+      await client.query('DELETE FROM case_reports WHERE id = $1 AND case_id = $2', [reportId, caseId])
+    })
     res.status(204).send()
   } catch (error) {
-    if (error instanceof HttpError) {
-      res.status(error.status).json({ message: error.message })
+    const mapped = mapAccessError(error)
+    if (mapped instanceof HttpError) {
+      res.status(mapped.status).json({ message: mapped.message })
       return
     }
     console.error('删除文字病历失败', error)

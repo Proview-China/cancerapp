@@ -7,6 +7,16 @@ export function AuthGate({ children }: { children: ReactNode }) {
   const [password, setPassword] = useState('')
   const [message, setMessage] = useState('')
   const [busy, setBusy] = useState(false)
+  useEffect(() => {
+    const unauthorized = () => setState('anonymous')
+    const forbidden = () => setMessage('当前账户无权执行此操作')
+    window.addEventListener('cancerapp:unauthorized', unauthorized)
+    window.addEventListener('cancerapp:forbidden', forbidden)
+    return () => {
+      window.removeEventListener('cancerapp:unauthorized', unauthorized)
+      window.removeEventListener('cancerapp:forbidden', forbidden)
+    }
+  }, [])
 
   const check = () => {
     setState('checking')
@@ -41,7 +51,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
     </form>
   </main>
   return <>
-    <button style={{ position: 'fixed', right: 150, top: 8, zIndex: 9999 }} disabled={busy} onClick={async () => {
+    <button style={{ position: 'fixed', right: 150, top: 8, width: 'auto', height: 36, zIndex: 9999 }} disabled={busy} onClick={async () => {
       setBusy(true)
       try { await logout(); setState('anonymous'); setMessage('') }
       catch (error) {

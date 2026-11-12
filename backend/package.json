@@ -8,6 +8,7 @@
     "build": "tsc -p tsconfig.json",
     "start": "node dist/server.js",
     "migrate:auth": "tsx src/db/migrate-auth.ts",
+    "migrate:case-access": "tsx src/db/migrate-case-access.ts",
     "admin:init": "tsx scripts/initialize-admin.ts",
     "admin:recover": "tsx scripts/recover-admin.ts",
     "test": "vitest run",

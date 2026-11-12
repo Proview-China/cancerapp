@@ -67,6 +67,7 @@ export type CaseRecord = {
   updatedAt: string
   samples: CaseSample[]
   reports: CaseReport[]
+  capabilities?: { read: boolean; edit: boolean; upload: boolean; delete: boolean; manageAccess: boolean }
 }
 
 export type CaseCreateSample = {

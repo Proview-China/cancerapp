@@ -46,6 +46,7 @@ export type CaseReportInput = {
 export type CaseWithRelations = CaseRecord & {
   samples: CaseSampleRecord[]
   reports: CaseReportRecord[]
+  capabilities?: { read: boolean; edit: boolean; upload: boolean; delete: boolean; manageAccess: boolean }
 }
 
 export type CaseCreateRequest = {
